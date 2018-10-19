@@ -11,6 +11,8 @@ use ieee.numeric_std.all;
 
 package fpga_pkg is
     function log2ceil (n : natural) return natural;
+    function reverse (n : std_logic_vector) return std_logic_vector;
+    function vector_or (n : std_logic_vector) return std_logic;
 
     constant ALL_ZEROS : std_logic_vector(1023 downto 0) := (others => '0');
     constant ALL_ONES  : std_logic_vector(1023 downto 0) := (others => '1');
@@ -33,5 +35,24 @@ package body fpga_pkg is
         end loop;
         return 1;
     end log2ceil;
+
+    function reverse (n : std_logic_vector) return std_logic_vector is
+        variable n_reverse : std_logic_vector(n'length-1 downto 0);
+    begin
+        for i in n'length-1 downto 0 loop
+            n_reverse(i) := n(n'high-i);
+        end loop;
+        return n_reverse;
+    end reverse;
+
+    function vector_or (n : std_logic_vector) return std_logic is
+        variable n_or : std_logic;
+    begin
+        n_or := '0';
+        for i in n'high downto n'low loop
+            n_or := n_or or n(i);
+        end loop;
+        return n_or;
+    end vector_or;
 
 end fpga_pkg;
