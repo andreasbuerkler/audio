@@ -4,6 +4,7 @@
 -- Filename  : fifo.vhd
 -- Changelog : 20.10.2018 - file created
 --             27.10.2018 - reject functionality added
+--             27.10.2018 - invert full/empty added
 --------------------------------------------------------------------------------
 
 library ieee;
@@ -12,12 +13,14 @@ use ieee.numeric_std.all;
 
 entity fifo is
 generic (
-    size_exp_g   : positive := 10;
-    data_width_g : positive := 8;
-    use_reject_g : boolean  := false);
+    size_exp_g     : positive := 10;
+    data_width_g   : positive := 8;
+    use_reject_g   : boolean  := false;
+    invert_full_g  : boolean  := false;
+    invert_empty_g : boolean  := false);
 port (
     clk_i    : in  std_logic;
-    reset_i  : in  std_logic;
+    reset_i  : in  std_logic; -- TODO: implement reset
     -- write port
     data_i   : in  std_logic_vector(data_width_g-1 downto 0);
     wr_i     : in  std_logic;
@@ -261,8 +264,22 @@ begin
         end if;
     end process flag_proc;
 
-    full_o <= full_r;
+    invert_full_gen : if (invert_full_g) generate
+        full_o <= not full_r;
+    end generate invert_full_gen;
+
+    normal_full_gen : if (not invert_full_g) generate
+        full_o <= full_r;
+    end generate normal_full_gen;
+
+    invert_empty_gen : if (invert_empty_g) generate
+        empty_o <= not empty_r;
+    end generate invert_empty_gen;
+
+    normal_empty_gen : if (not invert_empty_g) generate
+        empty_o <= empty_r;
+    end generate normal_empty_gen;
+
     data_o <= rd_data_r;
-    empty_o <= empty_r;
 
 end rtl;

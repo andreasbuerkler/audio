@@ -17,9 +17,11 @@ architecture rtl of fifo_tb is
 
     component fifo is
     generic (
-        size_exp_g   : positive := 10;
-        data_width_g : positive := 8;
-        use_reject_g : boolean  := false);
+        size_exp_g     : positive := 10;
+        data_width_g   : positive := 8;
+        use_reject_g   : boolean  := false;
+        invert_full_g  : boolean  := false;
+        invert_empty_g : boolean  := false);
     port (
         clk_i    : in  std_logic;
         reset_i  : in  std_logic;
@@ -72,9 +74,11 @@ begin
 
     i_fifo : fifo
     generic map (
-        size_exp_g   => 4,
-        data_width_g => 16,
-        use_reject_g => false)
+        size_exp_g     => 4,
+        data_width_g   => 16,
+        use_reject_g   => false,
+        invert_full_g  => false,
+        invert_empty_g => false)
     port map (
         clk_i    => clk,
         reset_i  => '0',
@@ -131,9 +135,11 @@ begin
 
     i_fifo_2 : fifo
     generic map (
-        size_exp_g   => 4,
-        data_width_g => 16,
-        use_reject_g => true)
+        size_exp_g     => 4,
+        data_width_g   => 16,
+        use_reject_g   => true,
+        invert_full_g  => false,
+        invert_empty_g => false)
     port map (
         clk_i    => clk,
         reset_i  => '0',

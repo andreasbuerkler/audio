@@ -26,32 +26,34 @@ architecture rtl of crc32_tb is
 
     component eth_fcs is
     port (
-        clk_i              : in  std_logic;
+        clk_i             : in  std_logic;
         -- rx data
-        rx_valid_i         : in  std_logic;
-        rx_data_i          : in  std_logic_vector(7 downto 0);
-        rx_valid_o         : out std_logic;
-        rx_data_o          : out std_logic_vector(7 downto 0);
-        rx_crc_fail_o      : out std_logic;
-        rx_crc_ok_o        : out std_logic;
+        rx_valid_i        : in  std_logic;
+        rx_data_i         : in  std_logic_vector(7 downto 0);
+        rx_fifo_full_i    : in  std_logic;
+        rx_valid_o        : out std_logic;
+        rx_last_o         : out std_logic;
+        rx_data_o         : out std_logic_vector(7 downto 0);
+        rx_crc_fail_o     : out std_logic;
+        rx_crc_ok_o       : out std_logic;
         -- tx data
-        tx_valid_i         : in  std_logic;
-        tx_ready_o         : out std_logic;
-        tx_last_i          : in  std_logic;
-        tx_data_i          : in  std_logic_vector(7 downto 0);
-        tx_valid_o         : out std_logic;
-        tx_ready_i         : in  std_logic;
-        tx_data_o          : out std_logic_vector(7 downto 0);
+        tx_valid_i        : in  std_logic;
+        tx_ready_o        : out std_logic;
+        tx_last_i         : in  std_logic;
+        tx_data_i         : in  std_logic_vector(7 downto 0);
+        tx_valid_o        : out std_logic;
+        tx_ready_i        : in  std_logic;
+        tx_data_o         : out std_logic_vector(7 downto 0);
         -- rx crc32
-        rx_crc_clear_o     : out std_logic;
-        rx_crc_valid_o     : out std_logic;
-        rx_crc_data_o      : out std_logic_vector(7 downto 0);
-        rx_crc_checksum_i  : in  std_logic_vector(31 downto 0);
+        rx_crc_clear_o    : out std_logic;
+        rx_crc_valid_o    : out std_logic;
+        rx_crc_data_o     : out std_logic_vector(7 downto 0);
+        rx_crc_checksum_i : in  std_logic_vector(31 downto 0);
         -- tx crc32
-        tx_crc_clear_o     : out std_logic;
-        tx_crc_valid_o     : out std_logic;
-        tx_crc_data_o      : out std_logic_vector(7 downto 0);
-        tx_crc_checksum_i  : in  std_logic_vector(31 downto 0));
+        tx_crc_clear_o    : out std_logic;
+        tx_crc_valid_o    : out std_logic;
+        tx_crc_data_o     : out std_logic_vector(7 downto 0);
+        tx_crc_checksum_i : in  std_logic_vector(31 downto 0));
     end component eth_fcs;
 
     component eth_padder is
@@ -124,7 +126,9 @@ begin
         -- rx data
         rx_valid_i         => rx_gen_valid,
         rx_data_i          => rx_gen_data,
+        rx_fifo_full_i     => '0',
         rx_valid_o         => open,
+        rx_last_o          => open,
         rx_data_o          => open,
         rx_crc_fail_o      => open,
         rx_crc_ok_o        => open,
@@ -187,10 +191,11 @@ begin
             rx_gen_data(7 downto 4) <= data_v(7 downto 4);
             rx_gen_valid <= '1';
             wait until rising_edge(clk);
+            rx_gen_valid <= '0';
+            wait until rising_edge(clk);
+            wait until rising_edge(clk);
+            wait until rising_edge(clk);
         end loop;
-
-        rx_gen_valid <= '0';
-
         wait;
     end process rx_data_gen_proc;
 

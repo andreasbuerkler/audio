@@ -3,6 +3,7 @@
 -- Date      : 16.10.2018
 -- Filename  : eth_fcs.vhd
 -- Changelog : 16.10.2018 - file created
+--           : 28.10.2018 - some bugfixes / rx_last_o and rx_fifo_full_i added
 --------------------------------------------------------------------------------
 
 library ieee;
@@ -14,52 +15,55 @@ use work.fpga_pkg.all;
 
 entity eth_fcs is
 port (
-    clk_i              : in  std_logic;
+    clk_i             : in  std_logic;
     -- rx data
-    rx_valid_i         : in  std_logic;
-    rx_data_i          : in  std_logic_vector(7 downto 0);
-    rx_valid_o         : out std_logic;
-    rx_data_o          : out std_logic_vector(7 downto 0);
-    rx_crc_fail_o      : out std_logic;
-    rx_crc_ok_o        : out std_logic;
+    rx_valid_i        : in  std_logic;
+    rx_data_i         : in  std_logic_vector(7 downto 0);
+    rx_fifo_full_i    : in  std_logic;
+    rx_valid_o        : out std_logic;
+    rx_last_o         : out std_logic;
+    rx_data_o         : out std_logic_vector(7 downto 0);
+    rx_crc_fail_o     : out std_logic;
+    rx_crc_ok_o       : out std_logic;
     -- tx data
-    tx_valid_i         : in  std_logic;
-    tx_ready_o         : out std_logic;
-    tx_last_i          : in  std_logic;
-    tx_data_i          : in  std_logic_vector(7 downto 0);
-    tx_valid_o         : out std_logic;
-    tx_ready_i         : in  std_logic;
-    tx_data_o          : out std_logic_vector(7 downto 0);
+    tx_valid_i        : in  std_logic;
+    tx_ready_o        : out std_logic;
+    tx_last_i         : in  std_logic;
+    tx_data_i         : in  std_logic_vector(7 downto 0);
+    tx_valid_o        : out std_logic;
+    tx_ready_i        : in  std_logic;
+    tx_data_o         : out std_logic_vector(7 downto 0);
     -- rx crc32
-    rx_crc_clear_o     : out std_logic;
-    rx_crc_valid_o     : out std_logic;
-    rx_crc_data_o      : out std_logic_vector(7 downto 0);
-    rx_crc_checksum_i  : in  std_logic_vector(31 downto 0);
+    rx_crc_clear_o    : out std_logic;
+    rx_crc_valid_o    : out std_logic;
+    rx_crc_data_o     : out std_logic_vector(7 downto 0);
+    rx_crc_checksum_i : in  std_logic_vector(31 downto 0);
     -- tx crc32
-    tx_crc_clear_o     : out std_logic;
-    tx_crc_valid_o     : out std_logic;
-    tx_crc_data_o      : out std_logic_vector(7 downto 0);
-    tx_crc_checksum_i  : in  std_logic_vector(31 downto 0));
+    tx_crc_clear_o    : out std_logic;
+    tx_crc_valid_o    : out std_logic;
+    tx_crc_data_o     : out std_logic_vector(7 downto 0);
+    tx_crc_checksum_i : in  std_logic_vector(31 downto 0));
 end entity eth_fcs;
 
 architecture rtl of eth_fcs is
 
-    signal data_vector_r   : std_logic_vector(31 downto 0) := (others => '0');
-    signal valid_vector_r  : std_logic_vector(3 downto 0) := (others => '0');
-    signal rx_valid_r      : std_logic := '0';
-    signal calc_done_r     : std_logic := '0';
-    signal data_mux_a      : std_logic_vector(7 downto 0);
-    signal valid_mux_a     : std_logic;
-    signal rx_received_crc : std_logic_vector(31 downto 0);
-    signal rx_crc          : std_logic_vector(31 downto 0);
-    signal rx_crc_fail_r   : std_logic := '0';
-    signal rx_crc_ok_r     : std_logic := '0';
-    signal rx_crc_data_r   : std_logic_vector(7 downto 0) := (others => '0');
-    signal rx_crc_valid_r  : std_logic := '0';
-
-    signal crc_vec_r  : std_logic_vector(3 downto 0) := (others => '0');
-    signal tx_crc     : std_logic_vector(31 downto 0);
-    signal crc_en_r   : std_logic := '0';
+    signal data_vector_r        : std_logic_vector(31 downto 0) := (others => '0');
+    signal valid_vector_r       : std_logic_vector(3 downto 0) := (others => '0');
+    signal calc_done_r          : std_logic := '0';
+    signal rx_crc               : std_logic_vector(31 downto 0);
+    signal rx_crc_fail_r        : std_logic := '0';
+    signal rx_crc_ok_r          : std_logic := '0';
+    signal rx_crc_data_r        : std_logic_vector(7 downto 0) := (others => '0');
+    signal rx_crc_data_out_r    : std_logic_vector(7 downto 0) := (others => '0');
+    signal rx_crc_valid_r       : std_logic := '0';
+    signal rx_crc_valid_pre_r   : std_logic := '0';
+    signal rx_crc_valid_out_r   : std_logic := '0';
+    signal rx_crc_last_r        : std_logic := '0';
+    signal rx_fifo_full_r       : std_logic := '0';
+    signal rx_timeout_counter_r : unsigned(2 downto 0) := "100";
+    signal crc_vec_r            : std_logic_vector(3 downto 0) := (others => '0');
+    signal tx_crc               : std_logic_vector(31 downto 0);
+    signal crc_en_r             : std_logic := '0';
 
 begin
 
@@ -73,8 +77,12 @@ begin
     begin
         if (rising_edge(clk_i)) then
 
+            -- shift register to delay input data by 4 bytes
             if (rx_valid_i = '1') then
                 data_vector_r <= data_vector_r(data_vector_r'high-8 downto 0) & rx_data_i;
+                rx_timeout_counter_r <= "011";
+            elsif (rx_timeout_counter_r(rx_timeout_counter_r'high) = '0') then
+                rx_timeout_counter_r <= rx_timeout_counter_r - 1;
             end if;
 
             if (rx_valid_i = '1') then
@@ -83,7 +91,15 @@ begin
                 valid_vector_r <= (others => '0');
             end if;
 
-            if (rx_crc = rx_crc_checksum_i) then
+            -- check full flag of rx fifo
+            if (rx_fifo_full_i = '1') and (rx_crc_valid_out_r = '1') then
+                rx_fifo_full_r <= '1';
+            elsif (calc_done_r = '1') then
+                rx_fifo_full_r <= '0';
+            end if;
+
+            -- compare crc
+            if ((rx_crc = rx_crc_checksum_i) and (rx_fifo_full_r = '0')) then
                 rx_crc_ok_r <= calc_done_r;
                 rx_crc_fail_r <= '0';
             else
@@ -91,11 +107,26 @@ begin
                 rx_crc_fail_r <= calc_done_r;
             end if;
 
-            rx_valid_r <= rx_valid_i;
-            calc_done_r <= (not rx_valid_i) and rx_valid_r;
+            -- detect end of packet
+            if (rx_timeout_counter_r = to_unsigned(0, rx_timeout_counter_r'length)) then
+                calc_done_r <= not rx_valid_i;
+            else
+                calc_done_r <= '0';
+            end if;
 
-            rx_crc_data_r <= data_vector_r(data_vector_r'high downto data_vector_r'high-7);
-            rx_crc_valid_r <= (valid_vector_r(valid_vector_r'high) and rx_valid_i);
+            -- output register
+            if ((rx_valid_i = '1') or (calc_done_r = '1')) then
+                rx_crc_data_r <= data_vector_r(data_vector_r'high downto data_vector_r'high-7);
+                rx_crc_data_out_r <= rx_crc_data_r;
+                rx_crc_last_r <= calc_done_r;
+                rx_crc_valid_pre_r <= valid_vector_r(valid_vector_r'high) and (not calc_done_r);
+                rx_crc_valid_out_r <= rx_crc_valid_pre_r;
+            else
+                rx_crc_valid_out_r <= '0';
+                rx_crc_last_r <= '0';
+            end if;
+
+            rx_crc_valid_r <= valid_vector_r(valid_vector_r'high) and rx_valid_i;
 
         end if;
     end process rx_proc;
@@ -115,8 +146,9 @@ begin
         end if;
     end process tx_proc;
 
-    rx_valid_o <= rx_crc_valid_r;
-    rx_data_o <= rx_crc_data_r;
+    rx_valid_o <= rx_crc_valid_out_r;
+    rx_last_o <= rx_crc_last_r;
+    rx_data_o <= rx_crc_data_out_r;
     rx_crc_fail_o <= rx_crc_fail_r;
     rx_crc_ok_o <= rx_crc_ok_r;
 
