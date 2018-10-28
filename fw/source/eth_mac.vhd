@@ -97,6 +97,7 @@ architecture rtl of eth_mac is
         tx_data_i         : in  std_logic_vector(7 downto 0);
         tx_valid_o        : out std_logic;
         tx_ready_i        : in  std_logic;
+        tx_last_o         : out std_logic;
         tx_data_o         : out std_logic_vector(7 downto 0);
         -- rx crc32
         rx_crc_clear_o    : out std_logic;
@@ -123,6 +124,7 @@ architecture rtl of eth_mac is
         data_out_o       : out std_logic_vector(7 downto 0);
         data_out_valid_o : out std_logic;
         data_in_i        : in  std_logic_vector(7 downto 0);
+        data_in_last_i   : in  std_logic;
         data_in_valid_i  : in  std_logic;
         data_in_ready_o  : out std_logic);
     end component rmii_interface;
@@ -153,6 +155,7 @@ architecture rtl of eth_mac is
     signal rx_crc_checksum : std_logic_vector(31 downto 0);
     signal fcs_tx_valid    : std_logic;
     signal fcs_tx_ready    : std_logic;
+    signal fcs_tx_last     : std_logic;
     signal fcs_tx_data     : std_logic_vector(7 downto 0);
     signal fcs_rx_valid    : std_logic;
     signal fcs_rx_data     : std_logic_vector(7 downto 0);
@@ -252,6 +255,7 @@ begin
         tx_data_i         => padder_data,
         tx_valid_o        => fcs_tx_valid,
         tx_ready_i        => fcs_tx_ready,
+        tx_last_o         => fcs_tx_last,
         tx_data_o         => fcs_tx_data,
         -- rx crc32
         rx_crc_clear_o    => rx_crc_clear,
@@ -277,6 +281,7 @@ begin
         data_out_o       => fcs_rx_data,
         data_out_valid_o => fcs_rx_valid,
         data_in_i        => fcs_tx_data,
+        data_in_last_i   => fcs_tx_last,
         data_in_valid_i  => fcs_tx_valid,
         data_in_ready_o  => fcs_tx_ready);
 

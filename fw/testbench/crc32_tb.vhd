@@ -43,6 +43,7 @@ architecture rtl of crc32_tb is
         tx_data_i         : in  std_logic_vector(7 downto 0);
         tx_valid_o        : out std_logic;
         tx_ready_i        : in  std_logic;
+        tx_last_o         : out std_logic;
         tx_data_o         : out std_logic_vector(7 downto 0);
         -- rx crc32
         rx_crc_clear_o    : out std_logic;
@@ -139,6 +140,7 @@ begin
         tx_data_i          => tx_pad_data,
         tx_valid_o         => open,
         tx_ready_i         => tx_ready,
+        tx_last_o          => open,
         tx_data_o          => open,
         -- rx crc32
         rx_crc_clear_o     => rx_clear,

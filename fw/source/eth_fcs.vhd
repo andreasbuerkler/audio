@@ -3,7 +3,8 @@
 -- Date      : 16.10.2018
 -- Filename  : eth_fcs.vhd
 -- Changelog : 16.10.2018 - file created
---           : 28.10.2018 - some bugfixes / rx_last_o and rx_fifo_full_i added
+--           : 28.10.2018 - some bugfixes / tx_last_o, rx_last_o and
+--                          rx_fifo_full_i added
 --------------------------------------------------------------------------------
 
 library ieee;
@@ -32,6 +33,7 @@ port (
     tx_data_i         : in  std_logic_vector(7 downto 0);
     tx_valid_o        : out std_logic;
     tx_ready_i        : in  std_logic;
+    tx_last_o         : out std_logic;
     tx_data_o         : out std_logic_vector(7 downto 0);
     -- rx crc32
     rx_crc_clear_o    : out std_logic;
@@ -158,6 +160,7 @@ begin
 
     tx_ready_o <= tx_ready_i and (not crc_en_r);
     tx_valid_o <= tx_valid_i or vector_or(crc_vec_r);
+    tx_last_o <= crc_vec_r(0);
     tx_data_o <= tx_crc(31 downto 24) when (crc_vec_r(3) = '1') else
                  tx_crc(23 downto 16) when (crc_vec_r(2) = '1') else
                  tx_crc(15 downto 8) when (crc_vec_r(1) = '1') else
