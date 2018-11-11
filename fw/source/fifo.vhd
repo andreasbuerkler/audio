@@ -78,11 +78,9 @@ begin
     end process ram_rd_proc;
 
     delay_proc : process (clk_i)
-        variable rd_en_v : std_logic := '0';
         variable wr_en_v : std_logic := '0';
     begin
         if (rising_edge(clk_i)) then
-            rd_en_v := rd_i and (not empty_r);
             wr_en_v := wr_i and (not full_r);
             word_counter_inc_r <= wr_en_v;
             if (use_reject_g) then

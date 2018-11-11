@@ -76,7 +76,7 @@ begin
             end if;
 
             if (rx_data_valid_r = '1') then
-                if ((rx_data_r = "11") and (rx_data_active_r = '0') and (rx_preamble_counter_r >= to_unsigned(28, rx_preamble_counter_r'length))) then
+                if ((rx_data_r = "11") and (rx_data_active_r = '0') and (rx_preamble_counter_r >= to_unsigned(24, rx_preamble_counter_r'length))) then
                     rx_offset_r <= rx_offset_counter_r + 1;
                     rx_data_active_next_r <= '1';
                 end if;

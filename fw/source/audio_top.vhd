@@ -24,11 +24,11 @@ port (
     eth_rx_d0_i  : in    std_logic;
     eth_rx_d1_i  : in    std_logic;
     eth_rx_dv_i  : in    std_logic;
-    eth_rx_er_i  : in    std_logic;
-    eth_rx_clk_i : in    std_logic;
-    eth_tx_en_o  : out   std_logic;
+    eth_rx_er_i  : in    std_logic; -- not used
+    eth_rx_clk_i : in    std_logic; -- not used
     eth_tx_d0_o  : out   std_logic;
     eth_tx_d1_o  : out   std_logic;
+    eth_tx_en_o  : out   std_logic;
     eth_mdio_io  : inout std_logic;
     eth_mdc_o    : out   std_logic;
 
@@ -76,21 +76,68 @@ architecture rtl of audio_top is
         data_i        : in  std_logic_vector(23 downto 0));
     end component i2s_inout;
 
-    constant CS4272_ADDR   : std_logic_vector(7 downto 0) := x"11";
-    constant CS4272_CONFIG : std_logic_vector := x"07_03" &
-                                                 x"01_01" &
-                                                 x"02_80" &
-                                                 x"03_29" &
-                                                 x"04_00" &
-                                                 x"05_00" &
-                                                 x"06_10" &
-                                                 x"07_02";
+    component eth_mac is
+    generic (
+        fifo_size_exp_g : positive := 10);
+    port (
+        clk_i        : in  std_logic;
+        reset_i      : in  std_logic;
+        -- tx
+        data_valid_i : in  std_logic;
+        data_ready_o : out std_logic;
+        last_i       : in  std_logic;
+        data_i       : in  std_logic_vector(7 downto 0);
+        -- rx
+        data_valid_o : out std_logic;
+        data_ready_i : in  std_logic;
+        last_o       : out std_logic;
+        data_o       : out std_logic_vector(7 downto 0);
+        -- rmii
+        rx_d_i       : in  std_logic_vector(1 downto 0);
+        rx_dv_i      : in  std_logic;
+        tx_d_o       : out std_logic_vector(1 downto 0);
+        tx_en_o      : out std_logic);
+    end component eth_mac;
+
+    component eth_subsystem is
+    generic (
+        mac_address_g  : std_logic_vector(47 downto 0);
+        ip_address_g   : std_logic_vector(31 downto 0);
+        arp_size_exp_g : positive := 3);
+    port (
+        clk_i       : in  std_logic;
+        reset_i     : in  std_logic;
+        -- mac rx
+        mac_valid_i : in  std_logic;
+        mac_ready_o : out std_logic;
+        mac_last_i  : in  std_logic;
+        mac_data_i  : in  std_logic_vector(7 downto 0);
+        -- mac tx
+        mac_valid_o : out std_logic;
+        mac_ready_i : in  std_logic;
+        mac_last_o  : out std_logic;
+        mac_data_o  : out std_logic_vector(7 downto 0));
+    end component eth_subsystem;
+
+    constant mac_address_c   : std_logic_vector(47 downto 0) := x"3C8D20040506";
+    constant ip_address_c    : std_logic_vector(31 downto 0) := x"C0A80164";
+    constant arp_size_exp_c  : positive := 3;
+    constant cs4272_addr_c   : std_logic_vector(7 downto 0) := x"11";
+    constant cs4272_config_c : std_logic_vector := x"07_03" &
+                                                   x"01_01" &
+                                                   x"02_80" &
+                                                   x"03_29" &
+                                                   x"04_00" &
+                                                   x"05_00" &
+                                                   x"06_10" &
+                                                   x"07_02";
 
     -- reset
     signal reset_counter_r       : unsigned(23 downto 0) := (others => '0');
     signal codec_reset_n_r       : std_logic := '0';
     signal config_reset_r        : std_logic := '1';
     signal config_reset_cc_vec_r : std_logic_vector(2 downto 0) := (others => '1');
+
     -- status led
     signal blink_counter_r : unsigned(24 downto 0) := (others => '0');
     signal i2c_error       : std_logic;
@@ -106,6 +153,20 @@ architecture rtl of audio_top is
     signal audio_l_valid   : std_logic;
     signal audio_r_valid   : std_logic;
     signal audio_data      : std_logic_vector(23 downto 0);
+
+    -- eth
+    signal tx_en : std_logic;
+    signal tx_d  : std_logic_vector(1 downto 0);
+
+    signal mac_rx_valid : std_logic;
+    signal mac_rx_ready : std_logic;
+    signal mac_rx_last  : std_logic;
+    signal mac_rx_data  : std_logic_vector(7 downto 0);
+
+    signal mac_tx_valid : std_logic;
+    signal mac_tx_ready : std_logic;
+    signal mac_tx_last  : std_logic;
+    signal mac_tx_data  : std_logic_vector(7 downto 0);
 
 begin
 
@@ -140,8 +201,8 @@ begin
 
     i_config : i2c_config
     generic map (
-        I2C_ADDRESS => CS4272_ADDR,
-        CONFIG      => CS4272_CONFIG,
+        I2C_ADDRESS => cs4272_addr_c,
+        CONFIG      => cs4272_config_c,
         FREQ_I      => 50000000,
         FREQ_O      => 100000)
     port map (
@@ -167,14 +228,56 @@ begin
         left_valid_i  => audio_l_valid,
         data_i        => audio_data);
 
+    i_mac : eth_mac
+    generic map (
+        fifo_size_exp_g => 11)
+    port map (
+        clk_i        => clk50_000_i,
+        reset_i      => '0',
+        -- tx
+        data_valid_i => mac_tx_valid,
+        data_ready_o => mac_tx_ready,
+        last_i       => mac_tx_last,
+        data_i       => mac_tx_data,
+        -- rx
+        data_valid_o => mac_rx_valid,
+        data_ready_i => mac_rx_ready,
+        last_o       => mac_rx_last,
+        data_o       => mac_rx_data,
+        -- rmii
+        rx_d_i(0)    => eth_rx_d0_i,
+        rx_d_i(1)    => eth_rx_d1_i,
+        rx_dv_i      => eth_rx_dv_i,
+        tx_d_o       => tx_d,
+        tx_en_o      => tx_en);
+
+    i_eth : eth_subsystem
+    generic map (
+        mac_address_g  => mac_address_c,
+        ip_address_g   => ip_address_c,
+        arp_size_exp_g => arp_size_exp_c)
+    port map (
+        clk_i       => clk50_000_i,
+        reset_i     => '0',
+        -- mac rx
+        mac_valid_i => mac_rx_valid,
+        mac_ready_o => mac_rx_ready,
+        mac_last_i  => mac_rx_last,
+        mac_data_i  => mac_rx_data,
+        -- mac tx
+        mac_valid_o => mac_tx_valid,
+        mac_ready_i => mac_tx_ready,
+        mac_last_o  => mac_tx_last,
+        mac_data_o  => mac_tx_data);
+
     -- output signals
     led_n_o      <= led_n_r;
 
     eth_rst_n_o  <= '1';
     eth_refclk_o <= clk50_000_i;
-    eth_tx_en_o  <= '0';
-    eth_tx_d0_o  <= '0';
-    eth_tx_d1_o  <= '0';
+    eth_tx_en_o  <= tx_en;
+    eth_tx_d0_o  <= tx_d(0);
+    eth_tx_d1_o  <= tx_d(1);
     eth_mdio_io  <= 'Z';
     eth_mdc_o    <= '0';
 
