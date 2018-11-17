@@ -123,9 +123,9 @@ set_global_assignment -name OUTPUT_IO_TIMING_NEAR_END_VMEAS "HALF VCCIO" -rise
 set_global_assignment -name OUTPUT_IO_TIMING_NEAR_END_VMEAS "HALF VCCIO" -fall
 set_global_assignment -name OUTPUT_IO_TIMING_FAR_END_VMEAS "HALF SIGNAL SWING" -rise
 set_global_assignment -name OUTPUT_IO_TIMING_FAR_END_VMEAS "HALF SIGNAL SWING" -fall
+set_global_assignment -name VHDL_FILE ../source/ram.vhd
 set_global_assignment -name VHDL_FILE ../source/eth_subsystem.vhd
 set_global_assignment -name VHDL_FILE ../source/eth_processing.vhd
-set_global_assignment -name VHDL_FILE ../source/arp_table.vhd
 set_global_assignment -name VHDL_FILE ../source/arp_processing.vhd
 set_global_assignment -name VHDL_FILE ../source/fifo.vhd
 set_global_assignment -name VHDL_FILE ../source/eth_padder.vhd

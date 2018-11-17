@@ -3,6 +3,7 @@
 -- Date      : 02.11.2018
 -- Filename  : arp_processing.vhd
 -- Changelog : 02.11.2018 - file created
+--           : 17.11.2018 - arp table interface removed / packet_nr added
 --------------------------------------------------------------------------------
 
 library ieee;
@@ -25,12 +26,7 @@ port (
     valid_o : out std_logic;
     ready_i : in  std_logic;
     last_o  : out std_logic;
-    data_o  : out std_logic_vector(7 downto 0);
-    -- arp table
-    mac_o   : out std_logic_vector(47 downto 0);
-    ip_o    : out std_logic_vector(31 downto 0);
-    store_o : out std_logic;
-    done_i  : in  std_logic);
+    data_o  : out std_logic_vector(7 downto 0));
 end entity arp_processing;
 
 architecture rtl of arp_processing is
@@ -46,6 +42,7 @@ architecture rtl of arp_processing is
     signal rx_ready_r                : std_logic := '1';
     signal shift_r                   : std_logic_vector(47 downto 0) := (others => '0');
     signal rx_offset_counter_r       : unsigned(5 downto 0) := (others => '0');
+    signal packet_nr_r               : std_logic_vector(7 downto 0) := (others => '0');
     signal hw_type_ok_r              : std_logic := '0';
     signal protocol_ok_r             : std_logic := '0';
     signal size_ok_r                 : std_logic := '0';
@@ -53,12 +50,10 @@ architecture rtl of arp_processing is
     signal ip_matches_r              : std_logic := '0';
     signal sender_ip_r               : std_logic_vector(31 downto 0) := (others => '0');
     signal sender_mac_r              : std_logic_vector(47 downto 0) := (others => '0');
-    signal sender_address_store_r    : std_logic := '0';
     signal send_response_r           : std_logic := '0';
     signal tx_offset_counter_r       : unsigned(5 downto 0) := (others => '0');
     signal tx_valid_r                : std_logic := '0';
     signal tx_last_r                 : std_logic := '0';
-    signal wait_for_stored_address_r : std_logic := '0';
 
     signal tx_fsm_r        : tx_fsm_t := idle_s;
     signal tx_data_shift_r : std_logic_vector(47 downto 0) := (others => '0');
@@ -74,34 +69,36 @@ begin
                 if (rx_offset_counter_r(rx_offset_counter_r'high) = '0') then
                     rx_offset_counter_r <= rx_offset_counter_r + 1;
                 end if;
-                if (rx_offset_counter_r = to_unsigned(2, rx_offset_counter_r'length)) then
+                if (rx_offset_counter_r = to_unsigned(1, rx_offset_counter_r'length)) then
+                    packet_nr_r <= shift_r(7 downto 0);
+                end if;
+                if (rx_offset_counter_r = to_unsigned(3, rx_offset_counter_r'length)) then
                     if (shift_r(15 downto 0) = expected_hw_type_c) then
                         hw_type_ok_r <= '1';
                     end if;
                 end if;
-                if (rx_offset_counter_r = to_unsigned(4, rx_offset_counter_r'length)) then
+                if (rx_offset_counter_r = to_unsigned(5, rx_offset_counter_r'length)) then
                     if (shift_r(15 downto 0) = expected_protocol_c) then
                         protocol_ok_r <= '1';
                     end if;
                 end if;
-                if (rx_offset_counter_r = to_unsigned(6, rx_offset_counter_r'length)) then
+                if (rx_offset_counter_r = to_unsigned(7, rx_offset_counter_r'length)) then
                     if (shift_r(15 downto 0) = expected_size_c) then
                         size_ok_r <= '1';
                     end if;
                 end if;
-                if (rx_offset_counter_r = to_unsigned(8, rx_offset_counter_r'length)) then
+                if (rx_offset_counter_r = to_unsigned(9, rx_offset_counter_r'length)) then
                     if (shift_r(15 downto 0) = expected_operation_c) then
                         send_request_r <= '1';
                     end if;
                 end if;
-                if (rx_offset_counter_r = to_unsigned(14, rx_offset_counter_r'length)) then
+                if (rx_offset_counter_r = to_unsigned(15, rx_offset_counter_r'length)) then
                     sender_mac_r <= shift_r;
                 end if;
-                if (rx_offset_counter_r = to_unsigned(18, rx_offset_counter_r'length)) then
+                if (rx_offset_counter_r = to_unsigned(19, rx_offset_counter_r'length)) then
                     sender_ip_r <= shift_r(31 downto 0);
-                    sender_address_store_r <= '1';
                 end if;
-                if (rx_offset_counter_r = to_unsigned(28, rx_offset_counter_r'length)) then
+                if (rx_offset_counter_r = to_unsigned(29, rx_offset_counter_r'length)) then
                     if (shift_r(31 downto 0) = ip_address_g) then
                         ip_matches_r <= '1';
                     end if;
@@ -120,25 +117,8 @@ begin
             end if;
 
             if (tx_last_r = '1') then
-                if (sender_address_store_r = '0') then
-                    rx_ready_r <= '1';
-                    send_request_r <= '0';
-                elsif (done_i = '0') then 
-                    wait_for_stored_address_r <= '1';
-                else
-                    rx_ready_r <= '1';
-                    send_request_r <= '0';
-                    wait_for_stored_address_r <= '0';
-                end if;
-            end if;
-
-            if (done_i = '1') then
-                sender_address_store_r <= '0';
-                if (wait_for_stored_address_r = '1') then
-                    rx_ready_r <= '1';
-                    send_request_r <= '0';
-                    wait_for_stored_address_r <= '0';
-                end if;
+                rx_ready_r <= '1';
+                send_request_r <= '0';
             end if;
 
         end if;
@@ -157,7 +137,7 @@ begin
 
             if ((ready_i = '1') and (tx_valid_r = '1')) then
                 tx_offset_counter_r <= tx_offset_counter_r(tx_offset_counter_r'high-1 downto 0) & '0';
-            else
+            elsif (tx_valid_r = '0') then
                 tx_offset_counter_r <= "000001";
             end if;
 
@@ -169,14 +149,14 @@ begin
                 when idle_s =>
                     tx_valid_r <= '0';
                     tx_last_r <= '0';
-                    tx_data_shift_r <= expected_hw_type_c & expected_protocol_c & x"0000";
+                    tx_data_shift_r <= packet_nr_r & expected_hw_type_c & expected_protocol_c & x"00";
                     if (send_response_r = '1') then
                         tx_fsm_r <= type_s;
                     end if;
 
                 when type_s =>
                     if ((ready_i = '1') and (tx_valid_r = '1')) then
-                        if (tx_offset_counter_r(3) = '1') then
+                        if (tx_offset_counter_r(4) = '1') then
                             tx_valid_r <= '0';
                             tx_data_shift_r <= expected_size_c & response_operation_c & x"0000";
                             tx_fsm_r <= size_s;
@@ -265,9 +245,5 @@ begin
     valid_o <= tx_valid_r;
     last_o <= tx_last_r;
     data_o <= tx_data_shift_r(47 downto 40);
-
-    mac_o <= sender_mac_r;
-    ip_o <= sender_ip_r;
-    store_o <= sender_address_store_r;
 
 end rtl;

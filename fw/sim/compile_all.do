@@ -2,19 +2,19 @@ vlib work
 
 # common
 vcom ../source/fpga_pkg.vhd -check_synthesis
+vcom ../source/fifo.vhd -check_synthesis
+vcom ../source/ram.vhd -check_synthesis
 
 # eth mac
 vcom ../source/rmii_interface.vhd -check_synthesis
 vcom ../source/crc32.vhd -check_synthesis
 vcom ../source/eth_fcs.vhd -check_synthesis
 vcom ../source/eth_padder.vhd -check_synthesis
-vcom ../source/fifo.vhd -check_synthesis
 vcom ../source/eth_mac.vhd -check_synthesis
 
 # eth subsystem
 vcom ../source/eth_processing.vhd -check_synthesis
 vcom ../source/arp_processing.vhd -check_synthesis
-vcom ../source/arp_table.vhd -check_synthesis
 vcom ../source/eth_subsystem.vhd -check_synthesis
 
 # biquad
