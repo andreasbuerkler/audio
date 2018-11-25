@@ -14,46 +14,46 @@ entity eth_processing is
 generic (
     mac_address_g : std_logic_vector(47 downto 0) := x"010203040506");
 port (
-    clk_i            : in  std_logic;
-    reset_i          : in  std_logic;
+    clk_i       : in  std_logic;
+    reset_i     : in  std_logic;
     -- mac rx
-    mac_valid_i      : in  std_logic;
-    mac_ready_o      : out std_logic;
-    mac_last_i       : in  std_logic;
-    mac_data_i       : in  std_logic_vector(7 downto 0);
+    mac_valid_i : in  std_logic;
+    mac_ready_o : out std_logic;
+    mac_last_i  : in  std_logic;
+    mac_data_i  : in  std_logic_vector(7 downto 0);
     -- arp rx
-    arp_valid_o      : out std_logic;
-    arp_ready_i      : in  std_logic;
-    arp_last_o       : out std_logic;
-    arp_data_o       : out std_logic_vector(7 downto 0);
+    arp_valid_o : out std_logic;
+    arp_ready_i : in  std_logic;
+    arp_last_o  : out std_logic;
+    arp_data_o  : out std_logic_vector(7 downto 0);
     -- ip rx
-    ip_valid_o       : out std_logic;
-    ip_ready_i       : in  std_logic;
-    ip_last_o        : out std_logic;
-    ip_data_o        : out std_logic_vector(7 downto 0);
+    ip_valid_o  : out std_logic;
+    ip_ready_i  : in  std_logic;
+    ip_last_o   : out std_logic;
+    ip_data_o   : out std_logic_vector(7 downto 0);
     -- mac tx
-    mac_valid_o      : out std_logic;
-    mac_ready_i      : in  std_logic;
-    mac_last_o       : out std_logic;
-    mac_data_o       : out std_logic_vector(7 downto 0);
+    mac_valid_o : out std_logic;
+    mac_ready_i : in  std_logic;
+    mac_last_o  : out std_logic;
+    mac_data_o  : out std_logic_vector(7 downto 0);
     -- arp tx
-    arp_valid_i      : in  std_logic;
-    arp_ready_o      : out std_logic;
-    arp_last_i       : in  std_logic;
-    arp_data_i       : in  std_logic_vector(7 downto 0);
+    arp_valid_i : in  std_logic;
+    arp_ready_o : out std_logic;
+    arp_last_i  : in  std_logic;
+    arp_data_i  : in  std_logic_vector(7 downto 0);
     -- ip tx
-    ip_valid_i       : in  std_logic;
-    ip_ready_o       : out std_logic;
-    ip_last_i        : in  std_logic;
-    ip_data_i        : in  std_logic_vector(7 downto 0));
+    ip_valid_i  : in  std_logic;
+    ip_ready_o  : out std_logic;
+    ip_last_i   : in  std_logic;
+    ip_data_i   : in  std_logic_vector(7 downto 0));
 end entity eth_processing;
 
 architecture rtl of eth_processing is
 
     component ram is
     generic (
-        addr_width_g   : positive := 11;
-        data_width_g   : positive := 8);
+        addr_width_g   : positive;
+        data_width_g   : positive);
     port (
         clk_i     : in  std_logic;
         -- write port

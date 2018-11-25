@@ -16,6 +16,8 @@ vcom ../source/eth_mac.vhd -check_synthesis
 vcom ../source/eth_processing.vhd -check_synthesis
 vcom ../source/arp_processing.vhd -check_synthesis
 vcom ../source/eth_subsystem.vhd -check_synthesis
+vcom ../source/eth_ip.vhd -check_synthesis
+vcom ../source/eth_icmp.vhd -check_synthesis
 
 # biquad
 vcom ../source/biquad_data_mem.vhd -check_synthesis
