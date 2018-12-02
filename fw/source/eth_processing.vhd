@@ -4,6 +4,7 @@
 -- Filename  : eth_processing.vhd
 -- Changelog : 02.11.2018 - file created
 --           : 17.11.2018 - mac ram added
+--           : 01.12.2018 - ip tx part added
 --------------------------------------------------------------------------------
 
 library ieee;
@@ -84,7 +85,8 @@ architecture rtl of eth_processing is
     signal rx_last_r               : std_logic := '0';
 
     signal tx_fsm_r            : tx_fsm_t := idle_s;
-    signal payload_r           : std_logic := '0';
+    signal payload_arp_r       : std_logic := '0';
+    signal payload_ip_r        : std_logic := '0';
     signal tx_offset_counter_r : std_logic_vector(5 downto 0) := (others => '0');
     signal tx_data_r           : std_logic_vector(7 downto 0) := (others => '0');
     signal tx_valid_r          : std_logic := '0';
@@ -97,8 +99,10 @@ architecture rtl of eth_processing is
     signal tx_packet_nr_r   : std_logic_vector(7 downto 0) := (others => '0');
     signal tx_mac           : std_logic_vector(7 downto 0);
     signal tx_arp_ready_r   : std_logic := '0';
+    signal tx_ip_ready_r    : std_logic := '0';
     signal tx_mac_counter_r : unsigned(2 downto 0) := (others => '0');
     signal tx_read_addr     : std_logic_vector(10 downto 0);
+    signal tx_is_arp_r      : std_logic := '0';
 
 begin
 
@@ -184,16 +188,24 @@ begin
     begin
         if (rising_edge(clk_i)) then
             tx_arp_ready_r <= '0';
+            tx_ip_ready_r <= '0';
 
             case (tx_fsm_r) is
                 when idle_s =>
-                    payload_r <= '0';
+                    payload_arp_r <= '0';
+                    payload_ip_r <= '0';
                     tx_valid_r <= '0';
                     tx_offset_counter_r <= (others => '0');
                     tx_mac_counter_r <= to_unsigned(7, tx_mac_counter_r'length);
                     if (arp_valid_i = '1') then
+                        tx_is_arp_r <= '1';
                         tx_arp_ready_r <= '1';
                         tx_packet_nr_r <= arp_data_i;
+                        tx_fsm_r <= load_s;
+                    elsif (ip_valid_i = '1') then
+                        tx_is_arp_r <= '0';
+                        tx_ip_ready_r <= '1';
+                        tx_packet_nr_r <= ip_data_i;
                         tx_fsm_r <= load_s;
                     end if;
 
@@ -221,7 +233,11 @@ begin
                     if (mac_ready_i = '1') then
                         if (tx_offset_counter_r(tx_offset_counter_r'high) = '1') then
                             tx_valid_r <= '0';
-                            tx_data_shift_r <= type_arp_c & x"00000000";
+                            if (tx_is_arp_r = '1') then
+                                tx_data_shift_r <= type_arp_c & x"00000000";
+                            else
+                                tx_data_shift_r <= type_ip_c & x"00000000";
+                            end if;
                             tx_fsm_r <= type_s;
                         else
                             tx_valid_r <= '1';
@@ -245,11 +261,14 @@ begin
                     end if;
 
                 when payload_s =>
-                    if ((arp_last_i = '1') and (arp_valid_i = '1') and (mac_ready_i = '1')) then
-                        payload_r <= '0';
+                    if ((((arp_last_i = '1') and (arp_valid_i = '1') and (tx_is_arp_r = '1')) or
+                         ((ip_last_i = '1') and (ip_valid_i = '1') and (tx_is_arp_r = '0'))) and (mac_ready_i = '1')) then
+                        payload_arp_r <= '0';
+                        payload_ip_r <= '0';
                         tx_fsm_r <= idle_s;
                     else
-                        payload_r <= '1';
+                        payload_arp_r <= tx_is_arp_r;
+                        payload_ip_r <= not tx_is_arp_r;
                     end if;
 
             end case;
@@ -267,9 +286,13 @@ begin
     ip_data_o <= rx_shift_r(7 downto 0) when (rx_send_nr_r = '0') else rx_packet_nr_r;
 
     -- tx output signals
-    arp_ready_o <= mac_ready_i when (payload_r = '1') else tx_arp_ready_r;
-    mac_valid_o <= arp_valid_i when (payload_r = '1') else tx_valid_r;
-    mac_last_o <= arp_last_i when (payload_r = '1') else '0';
-    mac_data_o <= arp_data_i when (payload_r = '1') else tx_data_r;
+    arp_ready_o <= mac_ready_i when (payload_arp_r = '1') else tx_arp_ready_r;
+    ip_ready_o <= mac_ready_i when (payload_ip_r = '1') else tx_ip_ready_r;
+    mac_valid_o <= arp_valid_i when (payload_arp_r = '1') else
+                   ip_valid_i when (payload_ip_r = '1') else tx_valid_r;
+    mac_last_o <= arp_last_i when (payload_arp_r = '1') else
+                  ip_last_i when (payload_ip_r = '1') else '0';
+    mac_data_o <= arp_data_i when (payload_arp_r = '1') else
+                  ip_data_i when (payload_ip_r = '1') else tx_data_r;
 
 end rtl;

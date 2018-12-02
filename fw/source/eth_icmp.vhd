@@ -3,11 +3,15 @@
 -- Date      : 24.11.2018
 -- Filename  : eth_icmp.vhd
 -- Changelog : 24.11.2018 - file created
+--           : 02.12.2018 - checksum calculation and length counter fixed
 --------------------------------------------------------------------------------
 
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
+
+library work;
+use work.fpga_pkg.all;
 
 entity eth_icmp is
 port (
@@ -52,7 +56,7 @@ architecture rtl of eth_icmp is
     constant icmp_echo_c : std_logic_vector(7 downto 0) := x"08";
     constant icmp_reply_c : std_logic_vector(7 downto 0) := x"00";
 
-    signal length_counter_r   : unsigned(15 downto 0) := (others => '0');
+    signal length_counter_r   : unsigned(15 downto 0) := (others => '1');
     signal send_en_r          : std_logic := '0';
     signal is_request_r       : std_logic := '0';
     signal checksum_r         : std_logic_vector(15 downto 0) := (others => '0');
@@ -74,20 +78,20 @@ begin
         if (rising_edge(clk_i)) then
             if ((icmp_valid_i = '1') and (fifo_full = '1') and (send_en_r = '0')) then
                 length_counter_r <= length_counter_r + 1;
-                if (length_counter_r = to_unsigned(1, length_counter_r'length) and (icmp_data_i = icmp_echo_c)) then
+                if (length_counter_r = to_unsigned(0, length_counter_r'length) and (icmp_data_i = icmp_echo_c)) then
                     is_request_r <= '1';
                 end if;
-                if (length_counter_r = to_unsigned(3, length_counter_r'length) ) then
+                if (length_counter_r = to_unsigned(2, length_counter_r'length) ) then
                     checksum_r(15 downto 8) <= icmp_data_i;
                 end if;
-                if (length_counter_r = to_unsigned(4, length_counter_r'length) ) then
+                if (length_counter_r = to_unsigned(3, length_counter_r'length) ) then
                     checksum_r(7 downto 0) <= icmp_data_i;
                 end if;
                 if (icmp_last_i = '1') then
                     send_en_r <= is_request_r;
                     is_request_r <= '0';
                     fifo_read_enable_r <= is_request_r;
-                    checksum_r <= std_logic_vector(unsigned(checksum_r) - 8);
+                    checksum_r <= not checksum_add((not checksum_r), x"F7FF");
                 end if;
             end if;
 
@@ -105,7 +109,7 @@ begin
                     send_counter_r <= (others => '0');
                     send_en_r <= '0';
                     fifo_read_enable_r <= '0';
-                    length_counter_r <= (others => '0');
+                    length_counter_r <= (others => '1');
                 end if;
             end if;
         end if;

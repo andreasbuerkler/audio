@@ -13,6 +13,7 @@ package fpga_pkg is
     function log2ceil (n : natural) return natural;
     function reverse (n : std_logic_vector) return std_logic_vector;
     function vector_or (n : std_logic_vector) return std_logic;
+    function checksum_add (n, u : std_logic_vector) return std_logic_vector;
 
     constant ALL_ZEROS : std_logic_vector(1023 downto 0) := (others => '0');
     constant ALL_ONES  : std_logic_vector(1023 downto 0) := (others => '1');
@@ -54,5 +55,15 @@ package body fpga_pkg is
         end loop;
         return n_or;
     end vector_or;
+
+    function checksum_add (n, u : std_logic_vector) return std_logic_vector is
+        variable n_sum  : unsigned((n'length+u'length)-1 downto 0);
+        variable retval : unsigned(n'range);
+    begin
+        n_sum := resize(unsigned(n), n_sum'length);
+        n_sum := n_sum + resize(unsigned(u), n_sum'length);
+        retval := n_sum(n'length-1 downto 0) + resize(n_sum(n_sum'high downto n'length), retval'length);
+        return std_logic_vector(retval);
+    end checksum_add;
 
 end fpga_pkg;
