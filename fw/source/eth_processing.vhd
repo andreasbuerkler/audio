@@ -67,7 +67,7 @@ architecture rtl of eth_processing is
         rd_addr_i : in  std_logic_vector(addr_width_g-1 downto 0));
     end component ram;
 
-    type tx_fsm_t is (idle_s, load_s, destination_s, source_s, type_s, payload_s);
+    type tx_fsm_t is (idle_s, load_mac_s, destination_s, source_s, type_s, payload_s);
 
     constant addr_broadcast_c : std_logic_vector(47 downto 0) := x"FFFFFFFFFFFF";
     constant type_vlan_c      : std_logic_vector(15 downto 0) := x"8100";
@@ -88,26 +88,33 @@ architecture rtl of eth_processing is
     signal payload_arp_r       : std_logic := '0';
     signal payload_ip_r        : std_logic := '0';
     signal tx_offset_counter_r : std_logic_vector(5 downto 0) := (others => '0');
-    signal tx_data_r           : std_logic_vector(7 downto 0) := (others => '0');
     signal tx_valid_r          : std_logic := '0';
     signal tx_data_shift_r     : std_logic_vector(47 downto 0) := (others => '0');
 
-    signal rx_packet_nr_r   : std_logic_vector(7 downto 0) := (others => '0');
-    signal rx_write_addr    : std_logic_vector(10 downto 0);
-    signal rx_write_en_r    : std_logic := '0';
-    signal rx_send_nr_r     : std_logic := '0';
-    signal tx_packet_nr_r   : std_logic_vector(7 downto 0) := (others => '0');
-    signal tx_mac           : std_logic_vector(7 downto 0);
-    signal tx_arp_ready_r   : std_logic := '0';
-    signal tx_ip_ready_r    : std_logic := '0';
-    signal tx_mac_counter_r : unsigned(2 downto 0) := (others => '0');
-    signal tx_read_addr     : std_logic_vector(10 downto 0);
-    signal tx_is_arp_r      : std_logic := '0';
+    signal rx_packet_nr_r                : std_logic_vector(7 downto 0) := (others => '0');
+    signal rx_write_addr                 : std_logic_vector(10 downto 0);
+    signal rx_write_en_r                 : std_logic := '0';
+    signal rx_send_nr_r                  : std_logic := '0';
+    signal tx_packet_nr_r                : std_logic_vector(7 downto 0) := (others => '0');
+    signal tx_mac                        : std_logic_vector(7 downto 0);
+    signal tx_arp_ready_r                : std_logic := '0';
+    signal tx_ip_ready_r                 : std_logic := '0';
+    signal tx_mac_counter_r              : unsigned(2 downto 0) := (others => '0');
+    signal tx_read_addr                  : std_logic_vector(10 downto 0);
+    signal tx_is_arp_r                   : std_logic := '0';
+    signal tx_data_load_source_address_r : std_logic := '0';
+    signal tx_data_load_type_arp_r       : std_logic := '0';
+    signal tx_data_load_type_ip_r        : std_logic := '0';
+    signal tx_data_mux_mac_sel_r         : std_logic := '0';
+    signal tx_load_mac_counter_r         : std_logic := '0';
+    signal tx_mac_read_en                : std_logic := '0';
+    signal tx_preload_mac_r              : std_logic := '0';
 
 begin
 
     rx_write_addr <= std_logic_vector(rx_offset_counter_r(2 downto 0)) & rx_packet_nr_r;
     tx_read_addr <= std_logic_vector(tx_mac_counter_r) & tx_packet_nr_r;
+    tx_mac_read_en <= (mac_ready_i and tx_valid_r) or tx_preload_mac_r;
 
     i_ram : ram
     generic map (
@@ -121,7 +128,7 @@ begin
         wr_addr_i => rx_write_addr,
         -- read port
         rd_data_o => tx_mac,
-        rd_i      => mac_ready_i,
+        rd_i      => tx_mac_read_en,
         rd_addr_i => tx_read_addr);
 
     rx_filter_proc : process (clk_i)
@@ -184,80 +191,69 @@ begin
         end if;
     end process rx_filter_proc;
 
-    tx_proc : process (clk_i)
+    tx_fsm_proc : process (clk_i)
     begin
         if (rising_edge(clk_i)) then
             tx_arp_ready_r <= '0';
             tx_ip_ready_r <= '0';
+            tx_load_mac_counter_r <= '0';
+            tx_preload_mac_r <= '0';
 
             case (tx_fsm_r) is
                 when idle_s =>
                     payload_arp_r <= '0';
                     payload_ip_r <= '0';
                     tx_valid_r <= '0';
-                    tx_offset_counter_r <= (others => '0');
-                    tx_mac_counter_r <= to_unsigned(7, tx_mac_counter_r'length);
                     if (arp_valid_i = '1') then
                         tx_is_arp_r <= '1';
                         tx_arp_ready_r <= '1';
                         tx_packet_nr_r <= arp_data_i;
-                        tx_fsm_r <= load_s;
+                        tx_load_mac_counter_r <= '1';
+                        tx_fsm_r <= load_mac_s;
                     elsif (ip_valid_i = '1') then
                         tx_is_arp_r <= '0';
                         tx_ip_ready_r <= '1';
                         tx_packet_nr_r <= ip_data_i;
-                        tx_fsm_r <= load_s;
+                        tx_load_mac_counter_r <= '1';
+                        tx_fsm_r <= load_mac_s;
                     end if;
 
-                when load_s =>
-                    if (mac_ready_i = '1') then
-                        tx_mac_counter_r <= tx_mac_counter_r + 1;
-                        tx_fsm_r <= destination_s;
-                    end if;
+                when load_mac_s =>
+                    tx_preload_mac_r <= '1';
+                    tx_fsm_r <= destination_s;
 
                 when destination_s =>
-                    tx_data_shift_r <= mac_address_g;
-                    if (mac_ready_i = '1') then
-                        tx_mac_counter_r <= tx_mac_counter_r + 1;
-                        if (tx_offset_counter_r(tx_offset_counter_r'high) = '1') then
-                            tx_valid_r <= '0';
-                            tx_fsm_r <= source_s;
-                        else
-                            tx_valid_r <= '1';
-                        end if;
-                        tx_offset_counter_r <= tx_offset_counter_r(tx_offset_counter_r'high-1 downto 0) & (not tx_valid_r);
-                        tx_data_r <= tx_mac;
+                    if ((tx_offset_counter_r(tx_offset_counter_r'high) = '1') and (mac_ready_i = '1')) then
+                        tx_valid_r <= '0';
+                        tx_data_mux_mac_sel_r <= '0';
+                        tx_data_load_source_address_r <= '0';
+                        tx_fsm_r <= source_s;
+                    else
+                        tx_data_load_source_address_r <= '1';
+                        tx_data_mux_mac_sel_r <= '1';
+                        tx_valid_r <= '1';
                     end if;
 
                 when source_s =>
-                    if (mac_ready_i = '1') then
-                        if (tx_offset_counter_r(tx_offset_counter_r'high) = '1') then
-                            tx_valid_r <= '0';
-                            if (tx_is_arp_r = '1') then
-                                tx_data_shift_r <= type_arp_c & x"00000000";
-                            else
-                                tx_data_shift_r <= type_ip_c & x"00000000";
-                            end if;
-                            tx_fsm_r <= type_s;
-                        else
-                            tx_valid_r <= '1';
-                            tx_data_shift_r <= tx_data_shift_r(tx_data_shift_r'high-8 downto 0) & x"00";
-                        end if;
-                        tx_offset_counter_r <= tx_offset_counter_r(tx_offset_counter_r'high-1 downto 0) & (not tx_valid_r);
-                        tx_data_r <= tx_data_shift_r(47 downto 40);
+                    if ((mac_ready_i = '1') and (tx_offset_counter_r(tx_offset_counter_r'high-1) = '1')) then
+                        tx_data_load_type_arp_r <= tx_is_arp_r;
+                        tx_data_load_type_ip_r <= not tx_is_arp_r;
+                    end if;
+                    if ((tx_offset_counter_r(tx_offset_counter_r'high) = '1') and (mac_ready_i = '1')) then
+                        tx_data_load_type_arp_r <= '0';
+                        tx_data_load_type_ip_r <= '0';
+                        tx_valid_r <= '0';
+                        tx_fsm_r <= type_s;
+                    else
+                        tx_valid_r <= '1';
                     end if;
 
                 when type_s =>
-                    if (mac_ready_i = '1') then
-                        if (tx_offset_counter_r(1) = '1') then
-                            tx_valid_r <= '0';
-                            tx_fsm_r <= payload_s;
-                        else
-                            tx_valid_r <= '1';
-                        end if;
-                        tx_offset_counter_r <= tx_offset_counter_r(tx_offset_counter_r'high-1 downto 0) & (not tx_valid_r);
-                        tx_data_shift_r <= tx_data_shift_r(tx_data_shift_r'high-8 downto 0) & x"00";
-                        tx_data_r <= tx_data_shift_r(47 downto 40);
+                    if ((tx_offset_counter_r(1) = '1') and (mac_ready_i = '1')) then
+                        tx_valid_r <= '0';
+                        tx_fsm_r <= payload_s;
+                    else
+                        tx_valid_r <= '1';
                     end if;
 
                 when payload_s =>
@@ -272,9 +268,39 @@ begin
                     end if;
 
             end case;
-
         end if;
-    end process tx_proc;
+    end process tx_fsm_proc;
+
+    tx_counter_proc : process (clk_i)
+    begin
+        if (rising_edge(clk_i)) then
+            if (tx_valid_r = '0') then
+                tx_offset_counter_r <= std_logic_vector(to_unsigned(1, tx_offset_counter_r'length));
+            elsif (mac_ready_i = '1') then
+                tx_offset_counter_r <= tx_offset_counter_r(tx_offset_counter_r'high-1 downto 0) & '0';
+            end if;
+            if (tx_load_mac_counter_r = '1') then
+                tx_mac_counter_r <= to_unsigned(7, tx_mac_counter_r'length);
+            elsif (((mac_ready_i = '1') and (tx_valid_r = '1')) or (tx_preload_mac_r = '1')) then
+                tx_mac_counter_r <= tx_mac_counter_r + 1;
+            end if;
+        end if;
+    end process tx_counter_proc;
+
+    tx_data_proc : process (clk_i)
+    begin
+        if (rising_edge(clk_i)) then
+            if (tx_data_load_source_address_r = '1') then
+                tx_data_shift_r <= mac_address_g;
+            elsif (tx_data_load_type_arp_r = '1') then
+                tx_data_shift_r(47 downto 32) <= type_arp_c;
+            elsif (tx_data_load_type_ip_r = '1') then
+                tx_data_shift_r(47 downto 32) <= type_ip_c;
+            elsif ((mac_ready_i = '1') and (tx_valid_r = '1')) then
+                tx_data_shift_r <= tx_data_shift_r(tx_data_shift_r'high-8 downto 0) & x"00";
+            end if;
+        end if;
+    end process tx_data_proc;
 
     -- rx output signals
     mac_ready_o <= arp_ready_i and ip_ready_i and (not rx_send_nr_r);
@@ -293,6 +319,8 @@ begin
     mac_last_o <= arp_last_i when (payload_arp_r = '1') else
                   ip_last_i when (payload_ip_r = '1') else '0';
     mac_data_o <= arp_data_i when (payload_arp_r = '1') else
-                  ip_data_i when (payload_ip_r = '1') else tx_data_r;
+                  ip_data_i when (payload_ip_r = '1') else 
+                  tx_mac when (tx_data_mux_mac_sel_r = '1') else
+                  tx_data_shift_r(47 downto 40);
 
 end rtl;
