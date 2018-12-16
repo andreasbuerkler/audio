@@ -56,6 +56,9 @@ architecture rtl of eth_subsystem_tb is
         empty_o  : out std_logic);
     end component fifo;
 
+    constant mac_address_c : std_logic_vector(47 downto 0) := x"010203040506";
+    constant ip_address_c  : std_logic_vector(31 downto 0) := x"c0a80164";
+
     constant test_arp_packet_c : std_logic_vector := x"ffffffff" &
                                                      x"ffff74d0" &
                                                      x"2b808ea2" &
@@ -71,6 +74,20 @@ architecture rtl of eth_subsystem_tb is
                                                      x"00000000" &
                                                      x"00000000" &
                                                      x"00000000";
+
+    constant response_arp_packet_c : std_logic_vector := x"74d02b80" &
+                                                         x"8ea2" & mac_address_c &
+                                                         x"08060001" &
+                                                         x"08000604" &
+                                                         x"0002" & mac_address_c &
+                                                         ip_address_c &
+                                                         x"74d02b80" &
+                                                         x"8ea2c0a8" &
+                                                         x"00100000" &
+                                                         x"00000000" &
+                                                         x"00000000" &
+                                                         x"00000000" &
+                                                         x"00000000";
 
     constant test_icmp_packet_c : std_logic_vector := x"01020304" &
                                                       x"05069ceb" &
@@ -92,26 +109,125 @@ architecture rtl of eth_subsystem_tb is
                                                       x"64656667" &
                                                       x"6869";
 
-    -- TODO: check wrong mac address, wrong ip address, wrong ip checksum, wrong protocol, packet with / without padding, automatic packet check
+    constant response_icmp_packet_c : std_logic_vector := x"9cebe80e" &
+                                                          x"6c62" & mac_address_c &
+                                                          x"08004500" &
+                                                          x"003c0000" &
+                                                          x"0000ff01" &
+                                                          x"a8a5c0a8" &
+                                                          x"0164c0a8" &
+                                                          x"01140000" &
+                                                          x"4d5a0001" &
+                                                          x"00016162" &
+                                                          x"63646566" &
+                                                          x"6768696a" &
+                                                          x"6b6c6d6e" &
+                                                          x"6f707172" &
+                                                          x"73747576" &
+                                                          x"77616263" &
+                                                          x"64656667" &
+                                                          x"6869";
 
-    constant mac_address_c : std_logic_vector(47 downto 0) := x"010203040506";
-    constant ip_address_c  : std_logic_vector(31 downto 0) := x"c0a80164";
+    constant test_udp_packet_c : std_logic_vector := x"01020304" &
+                                                     x"05069ceb" &
+                                                     x"e80e6c62" &
+                                                     x"08004500" &
+                                                     x"001e0002" &
+                                                     x"00008011" &
+                                                     x"b704c0a8" &
+                                                     x"0114c0a8" &
+                                                     x"01640102" &
+                                                     x"03040506" &
+                                                     x"0708090a" &
+                                                     x"00000000"; -- 4 byte padding
 
-    signal clk              : std_logic := '0';
-    signal mac_rx_valid     : std_logic := '0';
-    signal mac_rx_ready     : std_logic;
-    signal mac_rx_last      : std_logic := '0';
-    signal mac_rx_data      : std_logic_vector(7 downto 0) := (others => '0');
+    constant test_udp_short_packet_c : std_logic_vector := x"01020304" &
+                                                           x"05069ceb" &
+                                                           x"e80e6c62" &
+                                                           x"08004500" &
+                                                           x"00220002" &
+                                                           x"00008011" &
+                                                           x"b700c0a8" &
+                                                           x"0114c0a8" &
+                                                           x"01640102" &
+                                                           x"03040506" &
+                                                           x"0708090a"; -- 4 byte too short
 
-    signal mac_tx_ready_r       : std_logic := '0';
-    signal mac_tx_valid         : std_logic;
-    signal mac_tx_last          : std_logic;
-    signal mac_tx_data          : std_logic_vector(7 downto 0);
-    signal mac_rx_en            : std_logic := '0';
-    signal mac_fifo_wr_en       : std_logic;
-    signal tx_data_offset_r     : integer := 0;
-    signal idle_counter_r       : integer := 0;
-    signal packet_sel_counter_r : unsigned(0 downto 0) := (others => '0');
+    constant test_wrong_mac_packet_c : std_logic_vector := x"02020304" &
+                                                           x"05069ceb" &
+                                                           x"e80e6c62" &
+                                                           x"08004500" &
+                                                           x"001e0002" &
+                                                           x"00008011" &
+                                                           x"a8a5c0a8" &
+                                                           x"0114c0a8" &
+                                                           x"01640102" &
+                                                           x"03040506" &
+                                                           x"0708090a" &
+                                                           x"00000000";
+
+    constant test_wrong_ip_packet_c : std_logic_vector := x"01020304" &
+                                                          x"05069ceb" &
+                                                          x"e80e6c62" &
+                                                          x"08004500" &
+                                                          x"003c0e53" &
+                                                          x"00008001" &
+                                                          x"a8a4c0a8" &
+                                                          x"0114c0a8" &
+                                                          x"01650800" &
+                                                          x"4d5a0001" &
+                                                          x"00016162" &
+                                                          x"63646566" &
+                                                          x"6768696a" &
+                                                          x"6b6c6d6e" &
+                                                          x"6f707172" &
+                                                          x"73747576" &
+                                                          x"77616263" &
+                                                          x"64656667" &
+                                                          x"6869";
+
+    constant test_wrong_ip_checksum_packet_c : std_logic_vector := x"01020304" &
+                                                                   x"05069ceb" &
+                                                                   x"e80e6c62" &
+                                                                   x"08004500" &
+                                                                   x"003c0e53" &
+                                                                   x"00008001" &
+                                                                   x"a8a6c0a8" &
+                                                                   x"0114c0a8" &
+                                                                   x"01640800" &
+                                                                   x"4d5a0001" &
+                                                                   x"00016162" &
+                                                                   x"63646566" &
+                                                                   x"6768696a" &
+                                                                   x"6b6c6d6e" &
+                                                                   x"6f707172" &
+                                                                   x"73747576" &
+                                                                   x"77616263" &
+                                                                   x"64656667" &
+                                                                   x"6869";
+
+    signal clk                     : std_logic := '0';
+    signal mac_rx_valid            : std_logic := '0';
+    signal mac_rx_ready            : std_logic;
+    signal mac_rx_last             : std_logic := '0';
+    signal mac_rx_data             : std_logic_vector(7 downto 0) := (others => '0');
+
+    signal mac_tx_ready_r          : std_logic := '0';
+    signal mac_tx_valid            : std_logic;
+    signal mac_tx_last             : std_logic;
+    signal mac_tx_data             : std_logic_vector(7 downto 0);
+    signal mac_fifo_wr_en          : std_logic;
+    signal tx_data_offset_r        : integer := 0;
+    signal idle_counter_r          : integer := 0;
+    signal rx_packet_sel_counter_r : unsigned(2 downto 0) := (others => '0');
+
+    signal check_data_valid        : std_logic;
+    signal check_data_valid_r      : std_logic;
+    signal check_data              : std_logic_vector(7 downto 0);
+    signal check_data_counter_r    : integer := 0;
+    signal arp_packet_valid_r      : std_logic := '0';
+    signal icmp_packet_valid_r     : std_logic := '0';
+    signal tx_packet_sel_counter_r : unsigned(0 downto 0) := (others => '0');
 
 begin
 
@@ -150,7 +266,7 @@ begin
         data_width_g   => 8,
         use_reject_g   => true,
         invert_full_g  => false,
-        invert_empty_g => false)
+        invert_empty_g => true)
     port map (
         clk_i    => clk,
         reset_i  => '0',
@@ -161,9 +277,9 @@ begin
         reject_i => '0',
         full_o   => open,
         -- read port
-        data_o   => open,
+        data_o   => check_data,
         rd_i     => '1',
-        empty_o  => open);
+        empty_o  => check_data_valid);
 
     tx_ready_proc : process (clk)
         variable seed1_v : positive := 125;
@@ -182,42 +298,80 @@ begin
         end if;
     end process tx_ready_proc;
 
+    tx_check_proc : process (clk)
+    begin
+        if (rising_edge(clk)) then
+            check_data_valid_r <= check_data_valid;
+            if ((check_data_valid_r = '1') and (check_data_valid = '0')) then
+                tx_packet_sel_counter_r <= tx_packet_sel_counter_r + 1;
+            end if;
+            if (check_data_valid = '1') then
+                check_data_counter_r <= check_data_counter_r + 8;
+                if (tx_packet_sel_counter_r = to_unsigned(0, tx_packet_sel_counter_r'length)) then
+                    if (check_data = response_arp_packet_c(check_data_counter_r to check_data_counter_r+7)) then
+                        arp_packet_valid_r <= '1';
+                    else
+                        report "Error: received ARP packet wrong";
+                        arp_packet_valid_r <= '0';
+                    end if;
+                else
+                    if (check_data = response_icmp_packet_c(check_data_counter_r to check_data_counter_r+7)) then
+                        icmp_packet_valid_r <= '1';
+                    -- don't check checksum fields and ip identification field
+                    elsif ((check_data_counter_r /= 192) and (check_data_counter_r /= 200) and
+                           (check_data_counter_r /= 288) and (check_data_counter_r /= 296) and
+                           (check_data_counter_r /= 144) and (check_data_counter_r /= 152)) then
+                        report "Error: received ICMP packet wrong";
+                        icmp_packet_valid_r <= '0';
+                    end if;
+                end if;
+            else
+                check_data_counter_r <= 0;
+                icmp_packet_valid_r <= '0';
+                arp_packet_valid_r <= '0';
+            end if;
+        end if;
+    end process tx_check_proc;
+
     rx_data_gen_proc : process (clk)
         variable packet_length_v : positive;
     begin
         if (rising_edge(clk)) then
-            if (idle_counter_r < 100) then
-                idle_counter_r <= idle_counter_r + 1;
-                mac_rx_en <= '0';
-            else
-                mac_rx_en <= '1';
-            end if;
-
-            if ((mac_rx_ready = '1') and (mac_rx_en = '1')) then
+            if (mac_rx_ready = '1') then
                 mac_rx_valid <= '1';
-                if (packet_sel_counter_r = to_unsigned(0, packet_sel_counter_r'length)) then
+                if (rx_packet_sel_counter_r = to_unsigned(0, rx_packet_sel_counter_r'length)) then
                     mac_rx_data <= test_arp_packet_c(tx_data_offset_r to tx_data_offset_r+7);
                     packet_length_v := test_arp_packet_c'length;
-                else
+                elsif (rx_packet_sel_counter_r = to_unsigned(1, rx_packet_sel_counter_r'length)) then
                     mac_rx_data <= test_icmp_packet_c(tx_data_offset_r to tx_data_offset_r+7);
                     packet_length_v := test_icmp_packet_c'length;
+                elsif (rx_packet_sel_counter_r = to_unsigned(2, rx_packet_sel_counter_r'length)) then
+                    mac_rx_data <= test_udp_packet_c(tx_data_offset_r to tx_data_offset_r+7);
+                    packet_length_v := test_udp_packet_c'length;
+                elsif (rx_packet_sel_counter_r = to_unsigned(3, rx_packet_sel_counter_r'length)) then
+                    mac_rx_data <= test_wrong_mac_packet_c(tx_data_offset_r to tx_data_offset_r+7);
+                    packet_length_v := test_wrong_mac_packet_c'length;
+                elsif (rx_packet_sel_counter_r = to_unsigned(4, rx_packet_sel_counter_r'length)) then
+                    mac_rx_data <= test_wrong_ip_packet_c(tx_data_offset_r to tx_data_offset_r+7);
+                    packet_length_v := test_wrong_ip_packet_c'length;
+                elsif (rx_packet_sel_counter_r = to_unsigned(5, rx_packet_sel_counter_r'length)) then
+                    mac_rx_data <= test_wrong_ip_checksum_packet_c(tx_data_offset_r to tx_data_offset_r+7);
+                    packet_length_v := test_wrong_ip_checksum_packet_c'length;
+                else
+                    mac_rx_data <= test_udp_short_packet_c(tx_data_offset_r to tx_data_offset_r+7);
+                    packet_length_v := test_udp_short_packet_c'length;
                 end if;
 
                 if (tx_data_offset_r = (packet_length_v-8)) then
                     mac_rx_last <= '1';
                     tx_data_offset_r <= 0;
-                    mac_rx_en <= '0';
                     idle_counter_r <= 0;
-                    packet_sel_counter_r <= packet_sel_counter_r + 1;
+                    rx_packet_sel_counter_r <= rx_packet_sel_counter_r + 1;
                 else
                     tx_data_offset_r <= tx_data_offset_r + 8;
                     mac_rx_last <= '0';
                 end if;
-            elsif (mac_rx_en = '0') then
-                mac_rx_valid <= '0';
-                mac_rx_last <= '0';
             end if;
-
         end if;
     end process rx_data_gen_proc;
 

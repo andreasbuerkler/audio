@@ -87,8 +87,8 @@ architecture rtl of eth_ip is
     constant checksum_load_icmp_c : std_logic_vector(15 downto 0) := checksum_add(checksum_init, type_icmp_c);
     constant checksum_load_udp_c  : std_logic_vector(15 downto 0) := checksum_add(checksum_init, type_udp_c);
 
-    type tx_fsm_t is (idle_s, size_s, checksum_calc_s, packet_nr_s, length_s, flags_s, 
-                      checksum_s, source_address_s, destination_address_s, payload_s);
+    type tx_fsm_t is (idle_s, size_icmp_s, size_udp_s, checksum_calc_s, packet_nr_s, length_s,
+                      flags_s, checksum_s, source_address_s, destination_address_s, payload_s);
 
     signal rx_packet_nr_r         : std_logic_vector(7 downto 0) := (others => '0');
     signal rx_write_en_r          : std_logic := '0';
@@ -128,12 +128,16 @@ architecture rtl of eth_ip is
     signal tx_ip_read_en_r        : std_logic := '0';
     signal tx_ip_r                : std_logic_vector(7 downto 0) := (others => '0');
     signal tx_is_icmp_r           : std_logic := '0';
+    signal tx_offset_counter_en_r : std_logic_vector(3 downto 0) := (others => '0');
+    signal tx_data_mux_ctrl_r     : std_logic := '0';
+    signal tx_ip_counter_en_r     : std_logic := '0';
+    signal tx_data_mux_ip_sel_r   : std_logic := '0';
 
 begin
 
     rx_write_addr <= rx_packet_nr_r & std_logic_vector(rx_offset_counter_r(1 downto 0));
     tx_read_addr <= tx_packet_nr_r & std_logic_vector(tx_ip_counter_r);
-    tx_read_en <= eth_ready_i or tx_ip_read_en_r;
+    tx_read_en <= (eth_ready_i and tx_valid_r) or tx_ip_read_en_r;
 
     i_ram : ram
     generic map (
@@ -188,8 +192,26 @@ begin
             end if;
             if (eth_last_i = '1') then
                 rx_remove_padding_en_r <= '0';
-                rx_offset_counter_r <= (others => '0');
             end if;
+
+            if ((eth_valid_i = '1') and (udp_ready_i = '1') and (icmp_ready_i = '1') and (rx_send_nr_r = '0')) then
+                if (eth_last_i = '1') then
+                    rx_offset_counter_r <= (others => '0');
+                elsif (rx_offset_counter_r(rx_offset_counter_r'high) = '0') then
+                    rx_offset_counter_r <= rx_offset_counter_r + 1;
+                end if;
+            end if;
+
+            if ((eth_valid_i = '1') and (udp_ready_i = '1') and (icmp_ready_i = '1') and (rx_send_nr_r = '0')) then
+                if (eth_last_i = '1') then
+                    rx_total_length_r <= (others => '0');
+                elsif (rx_offset_counter_r = to_unsigned(5, rx_offset_counter_r'length)) then
+                    rx_total_length_r <= unsigned(rx_shift_r(15 downto 0));
+                else
+                    rx_total_length_r <= rx_total_length_r - 1;
+                end if;
+            end if;
+
             if ((eth_valid_i = '1') and (udp_ready_i = '1') and (icmp_ready_i = '1') and (rx_send_nr_r = '0')) then
                 rx_shift_r <= rx_shift_r(rx_shift_r'high-8 downto 0) & eth_data_i;
                 rx_last_r <= (rx_is_udp_r or rx_is_icmp_r) and eth_last_i;
@@ -197,10 +219,6 @@ begin
                     rx_remove_padding_en_r <= not eth_last_i;
                     rx_last_r <= '1';
                 end if;
-                if (rx_offset_counter_r(rx_offset_counter_r'high) = '0') then
-                    rx_offset_counter_r <= rx_offset_counter_r + 1;
-                end if;
-
                 if (rx_offset_counter_r = to_unsigned(1, rx_offset_counter_r'length)) then
                     rx_packet_nr_r <= rx_shift_r(7 downto 0);
                     rx_add_en_r <= '1';
@@ -212,11 +230,6 @@ begin
                     end if;
                 elsif (unsigned(rx_header_length_r) /= to_unsigned(0, rx_header_length_r'length)) then
                     rx_header_length_r <= std_logic_vector(unsigned(rx_header_length_r) - 1);
-                end if;
-                if (rx_offset_counter_r = to_unsigned(5, rx_offset_counter_r'length)) then
-                    rx_total_length_r <= unsigned(rx_shift_r(15 downto 0));
-                else
-                    rx_total_length_r <= rx_total_length_r - 1;
                 end if;
                 if (rx_offset_counter_r = to_unsigned(11, rx_offset_counter_r'length)) then
                     if (rx_shift_r(7 downto 0) = type_udp_c) then
@@ -261,99 +274,96 @@ begin
                     payload_icmp_r <= '0';
                     payload_udp_r <= '0';
                     tx_valid_r <= '0';
-                    tx_ip_counter_r <= to_unsigned(2, tx_ip_counter_r'length);
-                    tx_offset_counter_r <= "0010";
+                    tx_data_mux_ctrl_r <= '0';
+
                     if (icmp_valid_i = '1') then
                         tx_is_icmp_r <= '1';
                         tx_icmp_ready_r <= '1';
                         tx_checksum_r <= checksum_add(checksum_load_icmp_c, tx_identification_r);
                         tx_packet_nr_r <= icmp_data_i;
-                        tx_fsm_r <= size_s;
+                        tx_offset_counter_en_r(0) <= '1';
+                        tx_fsm_r <= size_icmp_s;
                     elsif (udp_valid_i = '1') then
                         tx_is_icmp_r <= '0';
                         tx_udp_ready_r <= '1';
                         tx_checksum_r <= checksum_add(checksum_load_udp_c, tx_identification_r);
                         tx_packet_nr_r <= udp_data_i;
-                        tx_fsm_r <= size_s;
+                        tx_offset_counter_en_r(1) <= '1';
+                        tx_fsm_r <= size_udp_s;
                     end if;
 
-                when size_s =>
+                when size_icmp_s =>
                     if (icmp_valid_i = '1') then
                         if (tx_offset_counter_r(tx_offset_counter_r'high) = '1') then
-                            if (tx_is_icmp_r = '1') then
-                                packet_length_v := unsigned(tx_length_r & icmp_data_i) + unsigned(header_length_c & "00");
-                            else
-                                packet_length_v := unsigned(tx_length_r & udp_data_i) + unsigned(header_length_c & "00");
-                            end if;
+                            packet_length_v := unsigned(tx_length_r & icmp_data_i) + unsigned(header_length_c & "00");
                             tx_data_shift_r <= ip_version_c & header_length_c & type_of_service_c & std_logic_vector(packet_length_v);
                             tx_icmp_ready_r <= '0';
-                            tx_udp_ready_r <= '0';
                             tx_ip_read_en_r <= '1';
+                            tx_offset_counter_en_r(2) <= '1';
+                            tx_ip_counter_en_r <= '1';
                             tx_fsm_r <= checksum_calc_s;
                         else
-                            if (tx_is_icmp_r = '1') then
-                                tx_icmp_ready_r <= '1';
-                                tx_length_r <= icmp_data_i;
-                            else
-                                tx_udp_ready_r <= '1';
-                                tx_length_r <= udp_data_i;
-                            end if;
+                            tx_icmp_ready_r <= '1';
+                            tx_length_r <= icmp_data_i;
                         end if;
-                        tx_offset_counter_r <= tx_offset_counter_r(tx_offset_counter_r'high-1 downto 0) & tx_offset_counter_r(tx_offset_counter_r'high);
+                    end if;
+
+                when size_udp_s =>
+                    if (udp_valid_i = '1') then
+                        if (tx_offset_counter_r(tx_offset_counter_r'high) = '1') then
+                            packet_length_v := unsigned(tx_length_r & udp_data_i) + unsigned(header_length_c & "00");
+                            tx_data_shift_r <= ip_version_c & header_length_c & type_of_service_c & std_logic_vector(packet_length_v);
+                            tx_udp_ready_r <= '0';
+                            tx_ip_read_en_r <= '1';
+                            tx_offset_counter_en_r(2) <= '1';
+                            tx_ip_counter_en_r <= '1';
+                            tx_fsm_r <= checksum_calc_s;
+                        else
+                            tx_udp_ready_r <= '1';
+                            tx_length_r <= udp_data_i;
+                        end if;
                     end if;
 
                 when checksum_calc_s =>
-                    tx_offset_counter_r <= tx_offset_counter_r(tx_offset_counter_r'high-1 downto 0) & '0';
-                    if (tx_offset_counter_r(0) = '1') then
+                    if (vector_or(tx_offset_counter_r) = '0') then
                         tx_checksum_r <= checksum_add(tx_checksum_r, tx_data_shift_r(15 downto 0));
-                    elsif ((tx_offset_counter_r(2) = '1') or (tx_ip_read_en_r = '0')) then
+                    elsif ((tx_offset_counter_r(1) = '1') or (tx_offset_counter_r(3) = '1')) then
                         tx_checksum_r <= checksum_add(tx_checksum_r, tx_ip_r & tx_ip);
                     end if;
                     if (tx_offset_counter_r(tx_offset_counter_r'high) = '1') then
                         tx_ip_read_en_r <= '0';
-                        tx_ip_counter_r <= tx_ip_counter_r + 1;
-                    elsif (vector_or(tx_offset_counter_r) = '1') then
-                        tx_ip_read_en_r <= '1';
-                        tx_ip_counter_r <= tx_ip_counter_r + 1;
-                    end if;
-                    if (tx_ip_read_en_r = '0') then
+                        tx_offset_counter_en_r(3) <= '1';
+                        tx_ip_counter_en_r <= '0';
                         tx_fsm_r <= packet_nr_s;
                     end if;
 
                 when packet_nr_s =>
-                    tx_data_r <= tx_packet_nr_r;
-                    if (eth_ready_i = '1') and (tx_valid_r = '1') then
+                    if (eth_ready_i = '1') then
+                        if (tx_offset_counter_r(tx_offset_counter_r'high) = '1') then
+                            tx_fsm_r <= length_s;
+                        end if;
+                        tx_data_mux_ctrl_r <= '1';
                         tx_valid_r <= '0';
-                        tx_fsm_r <= length_s;
                     else
-                        tx_valid_r <= '1';
+                        tx_valid_r <= not tx_data_mux_ctrl_r;
                     end if;
 
                 when length_s =>
                     if (eth_ready_i = '1') then
                         if (tx_offset_counter_r(tx_offset_counter_r'high) = '1') then
                             tx_valid_r <= '0';
-                        else
-                            tx_valid_r <= '1';
-                        end if;
-                        if (tx_offset_counter_r(tx_offset_counter_r'high) = '1') then
                             tx_data_shift_r <= tx_identification_r & x"0000";
                             tx_fsm_r <= flags_s;
                         else
+                            tx_valid_r <= '1';
                             tx_data_shift_r <= tx_data_shift_r(tx_data_shift_r'high-8 downto 0) & x"00";
                         end if;
-                        tx_offset_counter_r <= tx_offset_counter_r(tx_offset_counter_r'high-1 downto 0) & (not vector_or(tx_offset_counter_r));
-                        tx_data_r <= tx_data_shift_r(31 downto 24);
                     end if;
 
                 when flags_s =>
                     if (eth_ready_i = '1') then
                         if (tx_offset_counter_r(tx_offset_counter_r'high) = '1') then
                             tx_valid_r <= '0';
-                        else
-                            tx_valid_r <= '1';
-                        end if;
-                        if (tx_offset_counter_r(tx_offset_counter_r'high) = '1') then
                             if (tx_is_icmp_r = '1') then
                                 tx_data_shift_r <= ttl_c & type_icmp_c & (not tx_checksum_r);
                             else
@@ -361,59 +371,48 @@ begin
                             end if;
                             tx_fsm_r <= checksum_s;
                         else
+                            tx_valid_r <= '1';
                             tx_data_shift_r <= tx_data_shift_r(tx_data_shift_r'high-8 downto 0) & x"00";
                         end if;
-                        tx_offset_counter_r <= tx_offset_counter_r(tx_offset_counter_r'high-1 downto 0) & (not vector_or(tx_offset_counter_r));
-                        tx_data_r <= tx_data_shift_r(31 downto 24);
                     end if;
 
                 when checksum_s =>
                     if (eth_ready_i = '1') then
                         if (tx_offset_counter_r(tx_offset_counter_r'high) = '1') then
                             tx_valid_r <= '0';
-                        else
-                            tx_valid_r <= '1';
-                        end if;
-                        if (tx_offset_counter_r(tx_offset_counter_r'high) = '1') then
                             tx_data_shift_r <= ip_address_g;
                             tx_fsm_r <= source_address_s;
                         else
+                            tx_valid_r <= '1';
                             tx_data_shift_r <= tx_data_shift_r(tx_data_shift_r'high-8 downto 0) & x"00";
                         end if;
-                        tx_offset_counter_r <= tx_offset_counter_r(tx_offset_counter_r'high-1 downto 0) & (not vector_or(tx_offset_counter_r));
-                        tx_data_r <= tx_data_shift_r(31 downto 24);
                     end if;
 
                 when source_address_s =>
                     if (eth_ready_i = '1') then
                         if (tx_offset_counter_r(tx_offset_counter_r'high) = '1') then
                             tx_valid_r <= '0';
+                            tx_data_mux_ip_sel_r <= '1';
+                            tx_fsm_r <= destination_address_s;
                         else
                             tx_valid_r <= '1';
                         end if;
-                        if (tx_offset_counter_r(tx_offset_counter_r'high) = '1') then
-                            tx_ip_counter_r <= tx_ip_counter_r + 1;
-                            tx_fsm_r <= destination_address_s;
-                        else
-                            tx_data_shift_r <= tx_data_shift_r(tx_data_shift_r'high-8 downto 0) & x"00";
+                        if (tx_offset_counter_r(tx_offset_counter_r'high-1) = '1') then
+                            tx_ip_counter_en_r <= '1';
                         end if;
-                        tx_offset_counter_r <= tx_offset_counter_r(tx_offset_counter_r'high-1 downto 0) & (not vector_or(tx_offset_counter_r));
-                        tx_data_r <= tx_data_shift_r(31 downto 24);
+                        tx_data_shift_r <= tx_data_shift_r(tx_data_shift_r'high-8 downto 0) & x"00";
                     end if;
 
                 when destination_address_s =>
                     if (eth_ready_i = '1') then
                         if (tx_offset_counter_r(tx_offset_counter_r'high) = '1') then
                             tx_valid_r <= '0';
+                            tx_ip_counter_en_r <= '0';
+                            tx_data_mux_ip_sel_r <= '0';
+                            tx_fsm_r <= payload_s;
                         else
                             tx_valid_r <= '1';
                         end if;
-                        tx_ip_counter_r <= tx_ip_counter_r + 1;
-                        if (tx_offset_counter_r(tx_offset_counter_r'high) = '1') then
-                            tx_fsm_r <= payload_s;
-                        end if;
-                        tx_offset_counter_r <= tx_offset_counter_r(tx_offset_counter_r'high-1 downto 0) & (not vector_or(tx_offset_counter_r));
-                        tx_data_r <= tx_ip;
                     end if;
 
                 when payload_s =>
@@ -422,6 +421,7 @@ begin
                         payload_icmp_r <= '0';
                         payload_udp_r <= '0';
                         tx_identification_r <= std_logic_vector(unsigned(tx_identification_r) + 1);
+                        tx_offset_counter_en_r <= (others => '0');
                         tx_fsm_r <= idle_s;
                     else
                         payload_icmp_r <= tx_is_icmp_r;
@@ -433,10 +433,54 @@ begin
         end if;
     end process tx_packet_gen_proc;
 
+    tx_counter_proc : process (clk_i)
+    begin
+        if (rising_edge(clk_i)) then
+            if (tx_offset_counter_en_r(3) = '1') then
+                if (eth_ready_i = '1') then
+                    tx_offset_counter_r <= tx_offset_counter_r(tx_offset_counter_r'high-1 downto 0) & (not vector_or(tx_offset_counter_r));
+                end if;
+            elsif (tx_offset_counter_en_r(2) = '1') then
+                tx_offset_counter_r <= tx_offset_counter_r(tx_offset_counter_r'high-1 downto 0) & (not vector_or(tx_offset_counter_r));
+            elsif (tx_offset_counter_en_r(1) = '1') then
+                if (udp_valid_i = '1') then
+                    tx_offset_counter_r <= tx_offset_counter_r(tx_offset_counter_r'high-1 downto 0) & (not vector_or(tx_offset_counter_r));
+                end if;
+            elsif (tx_offset_counter_en_r(0) = '1') then
+                if (icmp_valid_i = '1') then
+                    tx_offset_counter_r <= tx_offset_counter_r(tx_offset_counter_r'high-1 downto 0) & (not vector_or(tx_offset_counter_r));
+                end if;
+            else
+                tx_offset_counter_r <= "0010";
+            end if;
+
+            if (tx_ip_counter_en_r = '1') then
+                if ((tx_valid_r = '1') and (eth_ready_i = '1')) then
+                    tx_ip_counter_r <= tx_ip_counter_r + 1;
+                end if;
+            else
+                tx_ip_counter_r <= to_unsigned(2, tx_ip_counter_r'length);
+            end if;
+        end if;
+    end process tx_counter_proc;
+
+    tx_data_proc : process (clk_i)
+    begin
+        if (rising_edge(clk_i)) then
+            if (tx_data_mux_ctrl_r = '1') then
+                if (eth_ready_i = '1') then
+                    tx_data_r <= tx_data_shift_r(31 downto 24);
+                end if;
+            else
+                tx_data_r <= tx_packet_nr_r;
+            end if;
+        end if;
+    end process tx_data_proc;
+
     -- rx output signals
     eth_ready_o <= (udp_ready_i and icmp_ready_i and (not rx_send_nr_r)) or rx_remove_padding_en_r;
     udp_valid_o <= rx_is_udp_r and rx_transmit_packet_r;
-    udp_last_o <= rx_last_r;
+    udp_last_o <= rx_last_r;    
     udp_data_o <= rx_shift_r(7 downto 0) when (rx_send_nr_r = '0') else rx_packet_nr_r;
     icmp_valid_o <= rx_is_icmp_r and rx_transmit_packet_r;
     icmp_last_o <= rx_last_r;
@@ -450,6 +494,8 @@ begin
     eth_last_o <= icmp_last_i when (payload_icmp_r = '1') else
                   udp_last_i when (payload_udp_r = '1') else '0';
     eth_data_o <= icmp_data_i when (payload_icmp_r = '1') else
-                  udp_data_i when (payload_udp_r = '1') else tx_data_r;
+                  udp_data_i when (payload_udp_r = '1') else 
+                  tx_ip when (tx_data_mux_ip_sel_r = '1') else
+                  tx_data_r;
 
 end rtl;

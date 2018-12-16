@@ -76,7 +76,6 @@ architecture rtl of eth_processing is
 
     signal rx_offset_counter_r     : unsigned(5 downto 0) := (others => '0');
     signal rx_shift_r              : std_logic_vector(47 downto 0) := (others => '0');
-    signal rx_type_r               : std_logic_vector(15 downto 0) := (others => '0');
     signal rx_vlan_tag_detected_r  : std_logic := '0';
     signal rx_is_ip_r              : std_logic := '0';
     signal rx_is_arp_r             : std_logic := '0';
@@ -290,14 +289,16 @@ begin
     tx_data_proc : process (clk_i)
     begin
         if (rising_edge(clk_i)) then
-            if (tx_data_load_source_address_r = '1') then
-                tx_data_shift_r <= mac_address_g;
-            elsif (tx_data_load_type_arp_r = '1') then
-                tx_data_shift_r(47 downto 32) <= type_arp_c;
-            elsif (tx_data_load_type_ip_r = '1') then
-                tx_data_shift_r(47 downto 32) <= type_ip_c;
-            elsif ((mac_ready_i = '1') and (tx_valid_r = '1')) then
-                tx_data_shift_r <= tx_data_shift_r(tx_data_shift_r'high-8 downto 0) & x"00";
+            if ((mac_ready_i = '1') and (tx_valid_r = '1')) then
+                if (tx_data_load_source_address_r = '1') then
+                    tx_data_shift_r <= mac_address_g;
+                elsif (tx_data_load_type_arp_r = '1') then
+                    tx_data_shift_r(47 downto 32) <= type_arp_c;
+                elsif (tx_data_load_type_ip_r = '1') then
+                    tx_data_shift_r(47 downto 32) <= type_ip_c;
+                else
+                    tx_data_shift_r <= tx_data_shift_r(tx_data_shift_r'high-8 downto 0) & x"00";
+                end if;
             end if;
         end if;
     end process tx_data_proc;
