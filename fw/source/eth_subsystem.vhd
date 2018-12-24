@@ -4,6 +4,7 @@
 -- Filename  : eth_subsystem.vhd
 -- Changelog : 10.11.2018 - file created
 --             17.11.2018 - arp table removed
+--             24.12.2018 - udp added
 --------------------------------------------------------------------------------
 
 library ieee;
@@ -13,7 +14,8 @@ use ieee.numeric_std.all;
 entity eth_subsystem is
 generic (
     mac_address_g  : std_logic_vector(47 downto 0) := x"010203040506";
-    ip_address_g   : std_logic_vector(31 downto 0) := x"01020304");
+    ip_address_g   : std_logic_vector(31 downto 0) := x"01020304";
+    ctrl_port_g    : std_logic_vector(15 downto 0) := x"0102");
 port (
     clk_i       : in  std_logic;
     reset_i     : in  std_logic;
@@ -142,6 +144,34 @@ architecture rtl of eth_subsystem is
         icmp_data_i  : in  std_logic_vector(7 downto 0));
     end component eth_icmp;
 
+    component eth_udp is
+    generic (
+        ctrl_port_g : std_logic_vector(15 downto 0));
+    port (
+        clk_i        : in  std_logic;
+        reset_i      : in  std_logic;
+        -- udp rx
+        udp_valid_i  : in  std_logic;
+        udp_ready_o  : out std_logic;
+        udp_last_i   : in  std_logic;
+        udp_data_i   : in  std_logic_vector(7 downto 0);
+        -- udp tx
+        udp_valid_o  : out std_logic;
+        udp_ready_i  : in  std_logic;
+        udp_last_o   : out std_logic;
+        udp_data_o   : out std_logic_vector(7 downto 0);
+        -- ctrl rx
+        ctrl_valid_o : out std_logic;
+        ctrl_ready_i : in  std_logic;
+        ctrl_last_o  : out std_logic;
+        ctrl_data_o  : out std_logic_vector(7 downto 0);
+        -- ctrl tx
+        ctrl_valid_i : in  std_logic;
+        ctrl_ready_o : out std_logic;
+        ctrl_last_i  : in  std_logic;
+        ctrl_data_i  : in  std_logic_vector(7 downto 0));
+    end component eth_udp;
+
     signal arp_rx_valid  : std_logic;
     signal arp_rx_ready  : std_logic;
     signal arp_rx_last   : std_logic;
@@ -156,6 +186,21 @@ architecture rtl of eth_subsystem is
     signal ip_rx_ready   : std_logic;
     signal ip_rx_last    : std_logic;
     signal ip_rx_data    : std_logic_vector(7 downto 0);
+
+    signal udp_rx_valid  : std_logic;
+    signal udp_rx_ready  : std_logic;
+    signal udp_rx_last   : std_logic;
+    signal udp_rx_data   : std_logic_vector(7 downto 0);
+
+    signal ctrl_valid    : std_logic;
+    signal ctrl_ready    : std_logic;
+    signal ctrl_last     : std_logic;
+    signal ctrl_data     : std_logic_vector(7 downto 0);
+
+    signal udp_tx_valid  : std_logic;
+    signal udp_tx_ready  : std_logic;
+    signal udp_tx_last   : std_logic;
+    signal udp_tx_data   : std_logic_vector(7 downto 0);
 
     signal ip_tx_valid   : std_logic;
     signal ip_tx_ready   : std_logic;
@@ -246,10 +291,10 @@ begin
         eth_last_i   => ip_rx_last,
         eth_data_i   => ip_rx_data,
         -- udp rx
-        udp_valid_o  => open,
-        udp_ready_i  => '1',
-        udp_last_o   => open,
-        udp_data_o   => open,
+        udp_valid_o  => udp_rx_valid,
+        udp_ready_i  => udp_rx_ready,
+        udp_last_o   => udp_rx_last,
+        udp_data_o   => udp_rx_data,
         -- icmp rx
         icmp_valid_o => icmp_rx_valid,
         icmp_ready_i => icmp_rx_ready,
@@ -261,10 +306,10 @@ begin
         eth_last_o   => ip_tx_last,
         eth_data_o   => ip_tx_data,
         -- udp tx
-        udp_valid_i  => '0',
-        udp_ready_o  => open,
-        udp_last_i   => '0',
-        udp_data_i   => x"00",
+        udp_valid_i  => udp_tx_valid,
+        udp_ready_o  => udp_tx_ready,
+        udp_last_i   => udp_tx_last,
+        udp_data_i   => udp_tx_data,
         -- icmp tx
         icmp_valid_i => icmp_tx_valid,
         icmp_ready_o => icmp_tx_ready,
@@ -285,6 +330,33 @@ begin
         icmp_ready_o => icmp_rx_ready,
         icmp_last_i  => icmp_rx_last,
         icmp_data_i  => icmp_rx_data);
+
+    i_udp : eth_udp
+    generic map (
+        ctrl_port_g => ctrl_port_g)
+    port map (
+        clk_i        => clk_i,
+        reset_i      => reset_i,
+        -- udp rx
+        udp_valid_i  => udp_rx_valid,
+        udp_ready_o  => udp_rx_ready,
+        udp_last_i   => udp_rx_last,
+        udp_data_i   => udp_rx_data,
+        -- udp tx
+        udp_valid_o  => udp_tx_valid,
+        udp_ready_i  => udp_tx_ready,
+        udp_last_o   => udp_tx_last,
+        udp_data_o   => udp_tx_data,
+        -- ctrl rx
+        ctrl_valid_o => ctrl_valid,
+        ctrl_ready_i => ctrl_ready,
+        ctrl_last_o  => ctrl_last,
+        ctrl_data_o  => ctrl_data,
+        -- ctrl tx
+        ctrl_valid_i => ctrl_valid,
+        ctrl_ready_o => ctrl_ready,
+        ctrl_last_i  => ctrl_last,
+        ctrl_data_i  => ctrl_data);
 
     mac_ready_o <= mac_ready;
     mac_valid_o <= mac_valid;

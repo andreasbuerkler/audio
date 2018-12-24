@@ -102,7 +102,8 @@ architecture rtl of audio_top is
     component eth_subsystem is
     generic (
         mac_address_g  : std_logic_vector(47 downto 0);
-        ip_address_g   : std_logic_vector(31 downto 0));
+        ip_address_g   : std_logic_vector(31 downto 0);
+        ctrl_port_g    : std_logic_vector(15 downto 0));
     port (
         clk_i       : in  std_logic;
         reset_i     : in  std_logic;
@@ -120,6 +121,8 @@ architecture rtl of audio_top is
 
     constant mac_address_c   : std_logic_vector(47 downto 0) := x"3C8D20040506";
     constant ip_address_c    : std_logic_vector(31 downto 0) := x"C0A80164";
+    constant ctrl_port_c     : std_logic_vector(15 downto 0) := x"1234";
+
     constant cs4272_addr_c   : std_logic_vector(7 downto 0) := x"11";
     constant cs4272_config_c : std_logic_vector := x"07_03" &
                                                    x"01_01" &
@@ -252,7 +255,8 @@ begin
     i_eth : eth_subsystem
     generic map (
         mac_address_g  => mac_address_c,
-        ip_address_g   => ip_address_c)
+        ip_address_g   => ip_address_c,
+        ctrl_port_g    => ctrl_port_c)
     port map (
         clk_i       => clk50_000_i,
         reset_i     => '0',

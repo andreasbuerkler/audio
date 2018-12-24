@@ -18,7 +18,8 @@ architecture rtl of eth_subsystem_tb is
     component eth_subsystem is
     generic (
         mac_address_g  : std_logic_vector(47 downto 0);
-        ip_address_g   : std_logic_vector(31 downto 0));
+        ip_address_g   : std_logic_vector(31 downto 0);
+        ctrl_port_g    : std_logic_vector(15 downto 0));
     port (
         clk_i       : in  std_logic;
         reset_i     : in  std_logic;
@@ -58,6 +59,7 @@ architecture rtl of eth_subsystem_tb is
 
     constant mac_address_c : std_logic_vector(47 downto 0) := x"010203040506";
     constant ip_address_c  : std_logic_vector(31 downto 0) := x"c0a80164";
+    constant ctrl_port_c   : std_logic_vector(15 downto 0) := x"1234";
 
     constant test_arp_packet_c : std_logic_vector := x"ffffffff" &
                                                      x"ffff74d0" &
@@ -137,9 +139,21 @@ architecture rtl of eth_subsystem_tb is
                                                      x"b704c0a8" &
                                                      x"0114c0a8" &
                                                      x"01640102" &
-                                                     x"03040506" &
-                                                     x"0708090a" &
+                                                     x"1234000A" &
+                                                     x"0000090a" &
                                                      x"00000000"; -- 4 byte padding
+
+    constant response_udp_packet_c : std_logic_vector := x"9cebe80e" &
+                                                         x"6c620102" &
+                                                         x"03040506" &
+                                                         x"08004500" &
+                                                         x"001e0002" &
+                                                         x"0000FF11" &
+                                                         x"b704c0a8" &
+                                                         x"0164c0a8" &
+                                                         x"01141234" &
+                                                         x"1234000A" &
+                                                         x"0000090a";
 
     constant test_udp_short_packet_c : std_logic_vector := x"01020304" &
                                                            x"05069ceb" &
@@ -152,6 +166,20 @@ architecture rtl of eth_subsystem_tb is
                                                            x"01640102" &
                                                            x"03040506" &
                                                            x"0708090a"; -- 4 byte too short
+
+    constant test_udp_wrong_port_packet_c : std_logic_vector := x"01020304" &
+                                                                x"05069ceb" &
+                                                                x"e80e6c62" &
+                                                                x"08004500" &
+                                                                x"00242e4e" &
+                                                                x"00008011" &
+                                                                x"88b2c0a8" &
+                                                                x"0114c0a8" &
+                                                                x"0164f50e" &
+                                                                x"07d00010" &
+                                                                x"83ea4865" &
+                                                                x"6c6c6f21" &
+                                                                x"2121";
 
     constant test_wrong_mac_packet_c : std_logic_vector := x"02020304" &
                                                            x"05069ceb" &
@@ -227,7 +255,8 @@ architecture rtl of eth_subsystem_tb is
     signal check_data_counter_r    : integer := 0;
     signal arp_packet_valid_r      : std_logic := '0';
     signal icmp_packet_valid_r     : std_logic := '0';
-    signal tx_packet_sel_counter_r : unsigned(0 downto 0) := (others => '0');
+    signal udp_packet_valid_r      : std_logic := '0';
+    signal tx_packet_sel_counter_r : unsigned(1 downto 0) := (others => '0');
 
 begin
 
@@ -243,7 +272,8 @@ begin
     i_eth : eth_subsystem
     generic map (
         mac_address_g  => mac_address_c,
-        ip_address_g   => ip_address_c)
+        ip_address_g   => ip_address_c,
+        ctrl_port_g    => ctrl_port_c)
     port map (
         clk_i       => clk,
         reset_i     => '0',
@@ -303,7 +333,11 @@ begin
         if (rising_edge(clk)) then
             check_data_valid_r <= check_data_valid;
             if ((check_data_valid_r = '1') and (check_data_valid = '0')) then
-                tx_packet_sel_counter_r <= tx_packet_sel_counter_r + 1;
+                if (tx_packet_sel_counter_r = to_unsigned(2, tx_packet_sel_counter_r'length)) then
+                    tx_packet_sel_counter_r <= (others => '0');
+                else
+                    tx_packet_sel_counter_r <= tx_packet_sel_counter_r + 1;
+                end if;
             end if;
             if (check_data_valid = '1') then
                 check_data_counter_r <= check_data_counter_r + 8;
@@ -314,7 +348,7 @@ begin
                         report "Error: received ARP packet wrong";
                         arp_packet_valid_r <= '0';
                     end if;
-                else
+                elsif (tx_packet_sel_counter_r = to_unsigned(1, tx_packet_sel_counter_r'length)) then
                     if (check_data = response_icmp_packet_c(check_data_counter_r to check_data_counter_r+7)) then
                         icmp_packet_valid_r <= '1';
                     -- don't check checksum fields and ip identification field
@@ -324,11 +358,21 @@ begin
                         report "Error: received ICMP packet wrong";
                         icmp_packet_valid_r <= '0';
                     end if;
+                else
+                    if (check_data = response_udp_packet_c(check_data_counter_r to check_data_counter_r+7)) then
+                        udp_packet_valid_r <= '1';
+                    -- don't check checksum field and ip identification field
+                    elsif ((check_data_counter_r /= 192) and (check_data_counter_r /= 200) and
+                           (check_data_counter_r /= 144) and (check_data_counter_r /= 152)) then
+                        report "Error: received UDP packet wrong";
+                        udp_packet_valid_r <= '0';
+                    end if;
                 end if;
             else
                 check_data_counter_r <= 0;
                 icmp_packet_valid_r <= '0';
                 arp_packet_valid_r <= '0';
+                udp_packet_valid_r <= '0';
             end if;
         end if;
     end process tx_check_proc;
@@ -357,6 +401,9 @@ begin
                 elsif (rx_packet_sel_counter_r = to_unsigned(5, rx_packet_sel_counter_r'length)) then
                     mac_rx_data <= test_wrong_ip_checksum_packet_c(tx_data_offset_r to tx_data_offset_r+7);
                     packet_length_v := test_wrong_ip_checksum_packet_c'length;
+                elsif (rx_packet_sel_counter_r = to_unsigned(6, rx_packet_sel_counter_r'length)) then
+                    mac_rx_data <= test_udp_wrong_port_packet_c(tx_data_offset_r to tx_data_offset_r+7);
+                    packet_length_v := test_udp_wrong_port_packet_c'length;
                 else
                     mac_rx_data <= test_udp_short_packet_c(tx_data_offset_r to tx_data_offset_r+7);
                     packet_length_v := test_udp_short_packet_c'length;

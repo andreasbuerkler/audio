@@ -24,6 +24,7 @@ if { $::argc != 1 } {
     vcom ../source/eth_subsystem.vhd -check_synthesis
     vcom ../source/eth_ip.vhd -check_synthesis
     vcom ../source/eth_icmp.vhd -check_synthesis
+    vcom ../source/eth_udp.vhd -check_synthesis
 
     # biquad
     vcom ../source/biquad_data_mem.vhd -check_synthesis
