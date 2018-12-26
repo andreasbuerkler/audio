@@ -455,7 +455,7 @@ begin
             end if;
 
             if (tx_ip_counter_en_r = '1') then
-                if ((tx_valid_r = '1') and (eth_ready_i = '1')) then
+                if (((tx_valid_r = '1') and (eth_ready_i = '1')) or (tx_ip_read_en_r = '1')) then
                     tx_ip_counter_r <= tx_ip_counter_r + 1;
                 end if;
             else

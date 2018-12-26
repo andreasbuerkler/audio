@@ -10,6 +10,9 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use ieee.math_real.all;
 
+library work;
+use work.fpga_pkg.all;
+
 entity eth_subsystem_tb is
 end entity eth_subsystem_tb;
 
@@ -252,11 +255,14 @@ architecture rtl of eth_subsystem_tb is
     signal check_data_valid        : std_logic;
     signal check_data_valid_r      : std_logic;
     signal check_data              : std_logic_vector(7 downto 0);
+    signal check_data_r            : std_logic_vector(7 downto 0) := (others => '0');
     signal check_data_counter_r    : integer := 0;
     signal arp_packet_valid_r      : std_logic := '0';
     signal icmp_packet_valid_r     : std_logic := '0';
     signal udp_packet_valid_r      : std_logic := '0';
     signal tx_packet_sel_counter_r : unsigned(1 downto 0) := (others => '0');
+    signal ip_packet_detected_r    : std_logic := '0';
+    signal ip_checksum_r           : std_logic_vector(15 downto 0) := (others => '0');
 
 begin
 
@@ -376,6 +382,31 @@ begin
             end if;
         end if;
     end process tx_check_proc;
+
+    tx_ip_checksum_check_proc : process (clk)
+    begin
+        if (rising_edge(clk)) then
+            check_data_r <= check_data;
+            if (check_data_valid = '0') then
+                ip_packet_detected_r <= '0';
+            elsif ((check_data_counter_r = 104) and (check_data_r = x"08") and (check_data = x"00")) then
+                ip_packet_detected_r <= '1';
+            end if;
+            if (check_data_valid = '0') then
+                ip_checksum_r <= (others => '0');
+            elsif ((check_data_counter_r = 120) or (check_data_counter_r = 136) or
+                (check_data_counter_r = 152) or (check_data_counter_r = 168) or
+                (check_data_counter_r = 184) or (check_data_counter_r = 200) or
+                (check_data_counter_r = 216) or (check_data_counter_r = 232) or
+                (check_data_counter_r = 248) or (check_data_counter_r = 264)) then
+                ip_checksum_r <= checksum_add(ip_checksum_r, check_data_r & check_data);
+            elsif ((check_data_counter_r = 272) and (ip_packet_detected_r = '1')) then
+                if (ip_checksum_r /= x"FFFF") then
+                    report "Error: received IP checksum wrong";
+                end if;
+            end if;
+        end if;
+    end process tx_ip_checksum_check_proc;
 
     rx_data_gen_proc : process (clk)
         variable packet_length_v : positive;

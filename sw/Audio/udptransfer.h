@@ -3,6 +3,7 @@
 
 #include <QObject>
 #include <QUdpSocket>
+#include <QNetworkInterface>
 
 namespace Ui {
     class UdpTransfer;
@@ -25,11 +26,14 @@ public slots:
     void readyRead();
 
 private:
+    QString getLocalAddress();
     void updateSocket();
 
-    QUdpSocket *_socket;
-    QString *_addressString;
-    QHostAddress *_address;
+    QUdpSocket *_sendSocket;
+    QString *_targetAddressString;
+    QHostAddress *_targetAddress;
+    QString *_hostAddressString;
+    QHostAddress *_hostAddress;
     quint16 _port;
 
 };
