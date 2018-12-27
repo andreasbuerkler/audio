@@ -27,16 +27,19 @@ DEFINES += QT_DEPRECATED_WARNINGS
 CONFIG += c++11
 
 SOURCES += \
-        main.cpp \
-        mainwindow.cpp \
-    udptransfer.cpp
+    main.cpp \
+    mainwindow.cpp \
+    udptransfer.cpp \
+    registeraccess.cpp
 
 HEADERS += \
-        mainwindow.h \
-    udptransfer.h
+    mainwindow.h \
+    udptransfer.h \
+    registeraccess.h \
+    typedefinitions.h
 
 FORMS += \
-        mainwindow.ui
+    mainwindow.ui
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin

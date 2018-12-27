@@ -1,27 +1,25 @@
+//------------------------------------------------------------------------------
+// Author    : Andreas Buerkler
+// Date      : 27.12.2018
+// Filename  : udptransfer.cpp
+// Changelog : 27.12.2018 - file created
+//------------------------------------------------------------------------------
+
 #include "udptransfer.h"
 
 UdpTransfer::UdpTransfer(QObject *parent) :
     QObject(parent),
     _sendSocket(new QUdpSocket(this)),
-    _targetAddressString(new QString("192.168.1.100")),
-    _targetAddress(new QHostAddress(*_targetAddressString)),
-    _hostAddressString(new QString("192.168.1.0")),
-    _hostAddress(new QHostAddress(*_hostAddressString)),
+    _targetAddressString("192.168.1.100"),
+    _targetAddress(_targetAddressString),
+    _hostAddressString("192.168.1.0"),
+    _hostAddress(_hostAddressString),
     _port(4660)
 {
-    *_hostAddressString = getLocalAddress();
-    _hostAddress->setAddress(*_hostAddressString);
-    _sendSocket->bind(*_hostAddress, _port);
-    connect(_sendSocket, SIGNAL(readyRead()), this, SLOT(readyRead()));
-}
-
-UdpTransfer::~UdpTransfer()
-{
-    delete _sendSocket;
-    delete _targetAddressString;
-    delete _targetAddress;
-    delete _hostAddressString;
-    delete _hostAddress;
+    _hostAddressString = getLocalAddress();
+    _hostAddress.setAddress(_hostAddressString);
+    _sendSocket.bind(_hostAddress, _port);
+    connect(&_sendSocket, SIGNAL(readyRead()), this, SLOT(readyRead()));
 }
 
 QString UdpTransfer::getLocalAddress()
@@ -38,7 +36,7 @@ QString UdpTransfer::getLocalAddress()
                     break;
                 }
             }
-            if (_targetAddress->isInSubnet(entry.ip(), bitcount)) {
+            if (_targetAddress.isInSubnet(entry.ip(), bitcount)) {
                 localhostIP = entry.ip().toString();
                 break;
             }
@@ -51,7 +49,7 @@ QString UdpTransfer::getLocalAddress()
 
 QString UdpTransfer::getAddress()
 {
-    return *_targetAddressString;
+    return _targetAddressString;
 }
 
 quint16 UdpTransfer::getPort()
@@ -59,55 +57,69 @@ quint16 UdpTransfer::getPort()
     return _port;
 }
 
-void UdpTransfer::setAddress(QString address)
+bool UdpTransfer::setAddress(QString address)
 {
-    if (*_targetAddressString != address) {
-        *_targetAddressString = address;
-        _targetAddress->setAddress(*_targetAddressString);
+    if (_targetAddressString != address) {
+        _targetAddressString = address;
+        _targetAddress.setAddress(_targetAddressString);
         QString localAddress = getLocalAddress();
-        if (*_hostAddressString != localAddress) {
-            *_hostAddressString = localAddress;
-            _hostAddress->setAddress(*_hostAddressString);
+        if (_hostAddressString != localAddress) {
+            _hostAddressString = localAddress;
+            _hostAddress.setAddress(_hostAddressString);
             updateSocket();
+            return true;
         }
     }
+    return false;
 }
 
-void UdpTransfer::setPort(quint16 port)
+bool UdpTransfer::setPort(quint16 port)
 {
     if (port != _port) {
         _port = port;
         updateSocket();
+        return true;
     }
+    return false;
 }
 
 void UdpTransfer::updateSocket()
 {
-    disconnect(_sendSocket, SIGNAL(readyRead()), this, SLOT(readyRead()));
-    delete _sendSocket;
-    _sendSocket = new QUdpSocket(this);
-    _sendSocket->bind(*_hostAddress, _port);
-    connect(_sendSocket, SIGNAL(readyRead()), this, SLOT(readyRead()));
+    disconnect(&_sendSocket, SIGNAL(readyRead()), this, SLOT(readyRead()));
+    _sendSocket.abort();
+    _sendSocket.bind(_hostAddress, _port);
+    connect(&_sendSocket, SIGNAL(readyRead()), this, SLOT(readyRead()));
 }
 
-void UdpTransfer::sendDatagram()
+void UdpTransfer::sendPacket(QByteArray &data)
 {
-    QByteArray msg;
-    msg.append("Hello!!!");
+    _sendSocket.writeDatagram(data, _targetAddress, _port);
+}
 
-    _sendSocket->writeDatagram(msg, *_targetAddress, _port);
+bool UdpTransfer::readPacket(quint8 id, QByteArray &data, int waitMs)
+{
+    _mutex.lock();
+    for (int index=0; index<_receiveBuffer.length(); index++) {
+        if (_receiveBuffer[index][0] == static_cast<char>(id)) {
+            data.setRawData(_receiveBuffer[index], static_cast<uint>(_receiveBuffer[index].size()));
+            _receiveBuffer.remove(index);
+            _mutex.unlock();
+            return true;
+        }
+    }
+    _mutex.unlock();
+    _sendSocket.waitForReadyRead(waitMs);
+    return false;
 }
 
 void UdpTransfer::readyRead()
 {
-    // when data comes in
     QByteArray buffer;
-    buffer.resize(static_cast<int>(_sendSocket->pendingDatagramSize()));
-
-    QHostAddress sender;
-    quint16 senderPort;
-
-    _sendSocket->readDatagram(buffer.data(), buffer.size(), &sender, &senderPort);
+    buffer.resize(static_cast<int>(_sendSocket.pendingDatagramSize()));
+    _sendSocket.readDatagram(buffer.data(), buffer.size());
+    _mutex.lock();
+    _receiveBuffer.append(buffer);
+    _mutex.unlock();
 
     qDebug() << "Message: " << buffer;
 }

@@ -1,3 +1,10 @@
+//------------------------------------------------------------------------------
+// Author    : Andreas Buerkler
+// Date      : 27.12.2018
+// Filename  : main.cpp
+// Changelog : 27.12.2018 - file created
+//------------------------------------------------------------------------------
+
 #include "mainwindow.h"
 #include <QApplication>
 

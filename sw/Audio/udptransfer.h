@@ -1,13 +1,17 @@
+//------------------------------------------------------------------------------
+// Author    : Andreas Buerkler
+// Date      : 27.12.2018
+// Filename  : udptransfer.h
+// Changelog : 27.12.2018 - file created
+//------------------------------------------------------------------------------
+
 #ifndef UDPTRANSFER_H
 #define UDPTRANSFER_H
 
 #include <QObject>
 #include <QUdpSocket>
 #include <QNetworkInterface>
-
-namespace Ui {
-    class UdpTransfer;
-}
+#include <QMutex>
 
 class UdpTransfer : public QObject
 {
@@ -15,26 +19,29 @@ class UdpTransfer : public QObject
 
 public:
     UdpTransfer(QObject *parent = nullptr);
-    ~UdpTransfer();
-    void sendDatagram();
+
+    void    sendPacket(QByteArray &data);
+    bool    readPacket(quint8 id, QByteArray &data, int waitMs);
     QString getAddress();
     quint16 getPort();
-    void setAddress(QString address);
-    void setPort(quint16 port);
+    bool    setAddress(QString address);
+    bool    setPort(quint16 port);
 
 public slots:
     void readyRead();
 
 private:
     QString getLocalAddress();
-    void updateSocket();
+    void    updateSocket();
 
-    QUdpSocket *_sendSocket;
-    QString *_targetAddressString;
-    QHostAddress *_targetAddress;
-    QString *_hostAddressString;
-    QHostAddress *_hostAddress;
-    quint16 _port;
+    QUdpSocket          _sendSocket;
+    QString             _targetAddressString;
+    QHostAddress        _targetAddress;
+    QString             _hostAddressString;
+    QHostAddress        _hostAddress;
+    quint16             _port;
+    QVector<QByteArray> _receiveBuffer;
+    QMutex              _mutex;
 
 };
 
