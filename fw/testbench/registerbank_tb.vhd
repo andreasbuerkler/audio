@@ -79,8 +79,8 @@ architecture rtl of registerbank_tb is
                                 x"00000006",
                                 x"00000007");
 
-    constant command_write_c         : std_logic_vector(7 downto 0) := x"01";
-    constant command_read_c          : std_logic_vector(7 downto 0) := x"02";
+    constant command_read_c          : std_logic_vector(7 downto 0) := x"01";
+    constant command_write_c         : std_logic_vector(7 downto 0) := x"02";
     constant command_read_response_c : std_logic_vector(7 downto 0) := x"04";
     constant command_read_timeout_c  : std_logic_vector(7 downto 0) := x"08";
 
@@ -187,6 +187,8 @@ begin
         begin
             ctrl_wait_for_signal (ready);
             valid <= '1';
+            data <= x"07"; -- packet number
+            ctrl_wait_for_signal (ready);
             data <= x"02"; -- id
             ctrl_wait_for_signal (ready);
             data <= command_write_c; -- command
@@ -225,6 +227,8 @@ begin
         begin
             ctrl_wait_for_signal (ready);
             valid <= '1';
+            data <= x"07"; -- packet number
+            ctrl_wait_for_signal (ready);
             data <= x"02"; -- id
             ctrl_wait_for_signal (ready);
             data <= command_read_c; -- command
@@ -251,6 +255,7 @@ begin
                                            variable rdata   : out std_logic_vector(data_width_c-1 downto 0)) is
             variable data_v : std_logic_vector(31 downto 0);
         begin
+            ctrl_wait_for_signal(valid); -- packet number
             ctrl_wait_for_signal(valid); -- id
             ctrl_wait_for_signal(valid); -- command
             if (data = command_read_timeout_c) then

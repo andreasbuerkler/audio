@@ -20,22 +20,31 @@ architecture rtl of eth_subsystem_tb is
 
     component eth_subsystem is
     generic (
-        mac_address_g  : std_logic_vector(47 downto 0);
-        ip_address_g   : std_logic_vector(31 downto 0);
-        ctrl_port_g    : std_logic_vector(15 downto 0));
+        mac_address_g        : std_logic_vector(47 downto 0);
+        ip_address_g         : std_logic_vector(31 downto 0);
+        ctrl_port_g          : std_logic_vector(15 downto 0);
+        ctrl_address_width_g : positive;
+        ctrl_data_width_g    : positive);
     port (
-        clk_i       : in  std_logic;
-        reset_i     : in  std_logic;
+        clk_i          : in  std_logic;
+        reset_i        : in  std_logic;
         -- mac rx
-        mac_valid_i : in  std_logic;
-        mac_ready_o : out std_logic;
-        mac_last_i  : in  std_logic;
-        mac_data_i  : in  std_logic_vector(7 downto 0);
+        mac_valid_i    : in  std_logic;
+        mac_ready_o    : out std_logic;
+        mac_last_i     : in  std_logic;
+        mac_data_i     : in  std_logic_vector(7 downto 0);
         -- mac tx
-        mac_valid_o : out std_logic;
-        mac_ready_i : in  std_logic;
-        mac_last_o  : out std_logic;
-        mac_data_o  : out std_logic_vector(7 downto 0));
+        mac_valid_o    : out std_logic;
+        mac_ready_i    : in  std_logic;
+        mac_last_o     : out std_logic;
+        mac_data_o     : out std_logic_vector(7 downto 0);
+        -- ctrl
+        ctrl_address_o : out std_logic_vector(ctrl_address_width_g-1 downto 0);
+        ctrl_data_o    : out std_logic_vector(ctrl_data_width_g-1 downto 0);
+        ctrl_data_i    : in  std_logic_vector(ctrl_data_width_g-1 downto 0);
+        ctrl_strobe_o  : out std_logic;
+        ctrl_write_o   : out std_logic;
+        ctrl_ack_i     : in  std_logic);
     end component eth_subsystem;
 
     component fifo is
@@ -60,9 +69,11 @@ architecture rtl of eth_subsystem_tb is
         empty_o  : out std_logic);
     end component fifo;
 
-    constant mac_address_c : std_logic_vector(47 downto 0) := x"010203040506";
-    constant ip_address_c  : std_logic_vector(31 downto 0) := x"c0a80164";
-    constant ctrl_port_c   : std_logic_vector(15 downto 0) := x"1234";
+    constant mac_address_c        : std_logic_vector(47 downto 0) := x"010203040506";
+    constant ip_address_c         : std_logic_vector(31 downto 0) := x"c0a80164";
+    constant ctrl_port_c          : std_logic_vector(15 downto 0) := x"1234";
+    constant ctrl_address_width_c : positive := 16;
+    constant ctrl_data_width_c    : positive := 32;
 
     constant test_arp_packet_c : std_logic_vector := x"ffffffff" &
                                                      x"ffff74d0" &
@@ -137,26 +148,29 @@ architecture rtl of eth_subsystem_tb is
                                                      x"05069ceb" &
                                                      x"e80e6c62" &
                                                      x"08004500" &
-                                                     x"001e0002" &
+                                                     x"00230002" &
                                                      x"00008011" &
-                                                     x"b704c0a8" &
+                                                     x"b6ffc0a8" &
                                                      x"0114c0a8" &
                                                      x"01640102" &
-                                                     x"1234000A" &
-                                                     x"0000090a" &
-                                                     x"00000000"; -- 4 byte padding
+                                                     x"1234000f" &
+                                                     x"00000701" &
+                                                     x"04000000" &
+                                                     x"04";
 
     constant response_udp_packet_c : std_logic_vector := x"9cebe80e" &
                                                          x"6c620102" &
                                                          x"03040506" &
                                                          x"08004500" &
-                                                         x"001e0002" &
-                                                         x"0000FF11" &
+                                                         x"00230002" &
+                                                         x"0000ff11" &
                                                          x"b704c0a8" &
                                                          x"0164c0a8" &
                                                          x"01141234" &
-                                                         x"1234000A" &
-                                                         x"0000090a";
+                                                         x"1234000f" &
+                                                         x"00000704" &
+                                                         x"04aabbcc" &
+                                                         x"dd";
 
     constant test_udp_short_packet_c : std_logic_vector := x"01020304" &
                                                            x"05069ceb" &
@@ -263,6 +277,8 @@ architecture rtl of eth_subsystem_tb is
     signal tx_packet_sel_counter_r : unsigned(1 downto 0) := (others => '0');
     signal ip_packet_detected_r    : std_logic := '0';
     signal ip_checksum_r           : std_logic_vector(15 downto 0) := (others => '0');
+    signal ctrl_strobe             : std_logic := '0';
+    signal ctrl_strobe_r           : std_logic := '0';
 
 begin
 
@@ -277,22 +293,38 @@ begin
 
     i_eth : eth_subsystem
     generic map (
-        mac_address_g  => mac_address_c,
-        ip_address_g   => ip_address_c,
-        ctrl_port_g    => ctrl_port_c)
+        mac_address_g        => mac_address_c,
+        ip_address_g         => ip_address_c,
+        ctrl_port_g          => ctrl_port_c,
+        ctrl_address_width_g => ctrl_address_width_c,
+        ctrl_data_width_g    => ctrl_data_width_c)
     port map (
-        clk_i       => clk,
-        reset_i     => '0',
+        clk_i          => clk,
+        reset_i        => '0',
         -- mac rx
-        mac_valid_i => mac_rx_valid,
-        mac_ready_o => mac_rx_ready,
-        mac_last_i  => mac_rx_last,
-        mac_data_i  => mac_rx_data,
+        mac_valid_i    => mac_rx_valid,
+        mac_ready_o    => mac_rx_ready,
+        mac_last_i     => mac_rx_last,
+        mac_data_i     => mac_rx_data,
         -- mac tx
-        mac_valid_o => mac_tx_valid,
-        mac_ready_i => mac_tx_ready_r,
-        mac_last_o  => mac_tx_last,
-        mac_data_o  => mac_tx_data);
+        mac_valid_o    => mac_tx_valid,
+        mac_ready_i    => mac_tx_ready_r,
+        mac_last_o     => mac_tx_last,
+        mac_data_o     => mac_tx_data,
+        -- ctrl
+        ctrl_address_o => open,
+        ctrl_data_o    => open,
+        ctrl_data_i    => x"aabbccdd",
+        ctrl_strobe_o  => ctrl_strobe,
+        ctrl_write_o   => open,
+        ctrl_ack_i     => ctrl_strobe_r);
+
+    ack_delay_proc : process (clk)
+    begin
+        if (rising_edge(clk)) then
+            ctrl_strobe_r <= ctrl_strobe;
+        end if;
+    end process ack_delay_proc;
 
     mac_fifo_wr_en <= mac_tx_valid and mac_tx_ready_r;
 

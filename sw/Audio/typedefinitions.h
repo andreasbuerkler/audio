@@ -22,6 +22,7 @@ static const int AUDIO_ADDRESS_FORMAT_ERROR  = 7;
 static const char UDP_READ          = 0x01;
 static const char UDP_WRITE         = 0x02;
 static const char UDP_READ_RESPONSE = 0x04;
+static const char UDP_READ_TIMEOUT  = 0x08;
 
 // error code translator
 #define errorToString(a) (a == AUDIO_SUCCESS)               ? "successful" : \

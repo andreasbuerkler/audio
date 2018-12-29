@@ -147,10 +147,10 @@ void MainWindow::onReadButtonPressed()
         quint32 data;
         error = _registerAccess.read(address, dataVector, 4);
         if (error == AUDIO_SUCCESS) {
-            data = (static_cast<quint32>(dataVector[3])<<24) |
-                   (static_cast<quint32>(dataVector[2])<<16) |
-                   (static_cast<quint32>(dataVector[1])<<8) |
-                    static_cast<quint32>(dataVector[0]);
+            data = (static_cast<quint32>(dataVector[0])<<24) |
+                   (static_cast<quint32>(dataVector[1])<<16) |
+                   (static_cast<quint32>(dataVector[2])<<8) |
+                    static_cast<quint32>(dataVector[3]);
             dataString.setNum(data, 16);
             _dataField.setText(dataString);
         }

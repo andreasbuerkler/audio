@@ -9,6 +9,9 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
+library work;
+use work.fpga_pkg.all;
+
 entity audio_top is
 port (
     -- clock input
@@ -101,23 +104,58 @@ architecture rtl of audio_top is
 
     component eth_subsystem is
     generic (
-        mac_address_g  : std_logic_vector(47 downto 0);
-        ip_address_g   : std_logic_vector(31 downto 0);
-        ctrl_port_g    : std_logic_vector(15 downto 0));
+        mac_address_g        : std_logic_vector(47 downto 0);
+        ip_address_g         : std_logic_vector(31 downto 0);
+        ctrl_port_g          : std_logic_vector(15 downto 0);
+        ctrl_address_width_g : positive;
+        ctrl_data_width_g    : positive);
     port (
-        clk_i       : in  std_logic;
-        reset_i     : in  std_logic;
+        clk_i          : in  std_logic;
+        reset_i        : in  std_logic;
         -- mac rx
-        mac_valid_i : in  std_logic;
-        mac_ready_o : out std_logic;
-        mac_last_i  : in  std_logic;
-        mac_data_i  : in  std_logic_vector(7 downto 0);
+        mac_valid_i    : in  std_logic;
+        mac_ready_o    : out std_logic;
+        mac_last_i     : in  std_logic;
+        mac_data_i     : in  std_logic_vector(7 downto 0);
         -- mac tx
-        mac_valid_o : out std_logic;
-        mac_ready_i : in  std_logic;
-        mac_last_o  : out std_logic;
-        mac_data_o  : out std_logic_vector(7 downto 0));
+        mac_valid_o    : out std_logic;
+        mac_ready_i    : in  std_logic;
+        mac_last_o     : out std_logic;
+        mac_data_o     : out std_logic_vector(7 downto 0);
+        -- ctrl
+        ctrl_address_o : out std_logic_vector(ctrl_address_width_g-1 downto 0);
+        ctrl_data_o    : out std_logic_vector(ctrl_data_width_g-1 downto 0);
+        ctrl_data_i    : in  std_logic_vector(ctrl_data_width_g-1 downto 0);
+        ctrl_strobe_o  : out std_logic;
+        ctrl_write_o   : out std_logic;
+        ctrl_ack_i     : in  std_logic);
     end component eth_subsystem;
+
+    component registerbank is
+    generic (
+        register_count_g : positive;
+        register_init_g  : std_logic_array_32;
+        data_width_g     : positive;
+        address_width_g  : positive);
+    port (
+        clk_i          : in  std_logic;
+        reset_i        : in  std_logic;
+        -- register
+        data_i         : in  std_logic_array_32(register_count_g-1 downto 0);
+        data_strb_i    : in  std_logic_vector(register_count_g-1 downto 0);
+        data_o         : out std_logic_array_32(register_count_g-1 downto 0);
+        data_strb_o    : out std_logic_vector(register_count_g-1 downto 0);
+        -- ctrl bus
+        ctrl_address_i : in  std_logic_vector(address_width_g-1 downto 0);
+        ctrl_data_i    : in  std_logic_vector(data_width_g-1 downto 0);
+        ctrl_data_o    : out std_logic_vector(data_width_g-1 downto 0);
+        ctrl_strobe_i  : in  std_logic;
+        ctrl_write_i   : in  std_logic;
+        ctrl_ack_o     : out std_logic);
+    end component registerbank;
+
+    constant ctrl_address_width_c : positive := 16;
+    constant ctrl_data_width_c    : positive := 32;
 
     constant mac_address_c   : std_logic_vector(47 downto 0) := x"3C8D20040506";
     constant ip_address_c    : std_logic_vector(31 downto 0) := x"C0A80164";
@@ -132,6 +170,11 @@ architecture rtl of audio_top is
                                                    x"05_00" &
                                                    x"06_10" &
                                                    x"07_02";
+
+    constant register_count_c : positive := 16;
+    constant register_init_c  : std_logic_array_32(register_count_c-1 downto 0) :=
+                               (0      => x"BEEF0123",
+                                others => x"00000000");
 
     -- reset
     signal reset_counter_r       : unsigned(23 downto 0) := (others => '0');
@@ -168,6 +211,18 @@ architecture rtl of audio_top is
     signal mac_tx_ready : std_logic;
     signal mac_tx_last  : std_logic;
     signal mac_tx_data  : std_logic_vector(7 downto 0);
+
+    -- ctrl bus
+    signal ctrl_address  : std_logic_vector(ctrl_address_width_c-1 downto 0);
+    signal ctrl_data_in  : std_logic_vector(ctrl_data_width_c-1 downto 0);
+    signal ctrl_data_out : std_logic_vector(ctrl_data_width_c-1 downto 0);
+    signal ctrl_strobe   : std_logic;
+    signal ctrl_write    : std_logic;
+    signal ctrl_ack      : std_logic;
+
+    -- registerbank
+    signal register_read_data : std_logic_array_32(register_count_c-1 downto 0) := (others => (others => '0'));
+    signal register_read_strb : std_logic_vector(register_count_c-1 downto 0) := (others => '0');
 
 begin
 
@@ -254,22 +309,53 @@ begin
 
     i_eth : eth_subsystem
     generic map (
-        mac_address_g  => mac_address_c,
-        ip_address_g   => ip_address_c,
-        ctrl_port_g    => ctrl_port_c)
+        mac_address_g        => mac_address_c,
+        ip_address_g         => ip_address_c,
+        ctrl_port_g          => ctrl_port_c,
+        ctrl_address_width_g => ctrl_address_width_c,
+        ctrl_data_width_g    => ctrl_data_width_c)
     port map (
-        clk_i       => clk50_000_i,
-        reset_i     => '0',
+        clk_i          => clk50_000_i,
+        reset_i        => '0',
         -- mac rx
-        mac_valid_i => mac_rx_valid,
-        mac_ready_o => mac_rx_ready,
-        mac_last_i  => mac_rx_last,
-        mac_data_i  => mac_rx_data,
+        mac_valid_i    => mac_rx_valid,
+        mac_ready_o    => mac_rx_ready,
+        mac_last_i     => mac_rx_last,
+        mac_data_i     => mac_rx_data,
         -- mac tx
-        mac_valid_o => mac_tx_valid,
-        mac_ready_i => mac_tx_ready,
-        mac_last_o  => mac_tx_last,
-        mac_data_o  => mac_tx_data);
+        mac_valid_o    => mac_tx_valid,
+        mac_ready_i    => mac_tx_ready,
+        mac_last_o     => mac_tx_last,
+        mac_data_o     => mac_tx_data,
+        -- ctrl
+        ctrl_address_o => ctrl_address,
+        ctrl_data_o    => ctrl_data_out,
+        ctrl_data_i    => ctrl_data_in,
+        ctrl_strobe_o  => ctrl_strobe,
+        ctrl_write_o   => ctrl_write,
+        ctrl_ack_i     => ctrl_ack);
+
+    i_registerbank : registerbank
+    generic map (
+        register_count_g => register_count_c,
+        register_init_g  => register_init_c,
+        data_width_g     => ctrl_data_width_c,
+        address_width_g  => ctrl_address_width_c-2)
+    port map (
+        clk_i          => clk50_000_i,
+        reset_i        => '0',
+        -- register
+        data_i         => register_read_data,
+        data_strb_i    => register_read_strb,
+        data_o         => open,
+        data_strb_o    => open,
+        -- ctrl bus
+        ctrl_address_i => ctrl_address(ctrl_address_width_c-1 downto 2),
+        ctrl_data_i    => ctrl_data_out,
+        ctrl_data_o    => ctrl_data_in,
+        ctrl_strobe_i  => ctrl_strobe,
+        ctrl_write_i   => ctrl_write,
+        ctrl_ack_o     => ctrl_ack);
 
     -- output signals
     led_n_o      <= led_n_r;

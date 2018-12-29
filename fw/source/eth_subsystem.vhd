@@ -5,6 +5,7 @@
 -- Changelog : 10.11.2018 - file created
 --             17.11.2018 - arp table removed
 --             24.12.2018 - udp added
+--             29.12.2018 - ctrl added
 --------------------------------------------------------------------------------
 
 library ieee;
@@ -13,22 +14,31 @@ use ieee.numeric_std.all;
 
 entity eth_subsystem is
 generic (
-    mac_address_g  : std_logic_vector(47 downto 0) := x"010203040506";
-    ip_address_g   : std_logic_vector(31 downto 0) := x"01020304";
-    ctrl_port_g    : std_logic_vector(15 downto 0) := x"0102");
+    mac_address_g        : std_logic_vector(47 downto 0) := x"010203040506";
+    ip_address_g         : std_logic_vector(31 downto 0) := x"01020304";
+    ctrl_port_g          : std_logic_vector(15 downto 0) := x"0102";
+    ctrl_address_width_g : positive := 16;
+    ctrl_data_width_g    : positive := 32);
 port (
-    clk_i       : in  std_logic;
-    reset_i     : in  std_logic;
+    clk_i          : in  std_logic;
+    reset_i        : in  std_logic;
     -- mac rx
-    mac_valid_i : in  std_logic;
-    mac_ready_o : out std_logic;
-    mac_last_i  : in  std_logic;
-    mac_data_i  : in  std_logic_vector(7 downto 0);
+    mac_valid_i    : in  std_logic;
+    mac_ready_o    : out std_logic;
+    mac_last_i     : in  std_logic;
+    mac_data_i     : in  std_logic_vector(7 downto 0);
     -- mac tx
-    mac_valid_o : out std_logic;
-    mac_ready_i : in  std_logic;
-    mac_last_o  : out std_logic;
-    mac_data_o  : out std_logic_vector(7 downto 0));
+    mac_valid_o    : out std_logic;
+    mac_ready_i    : in  std_logic;
+    mac_last_o     : out std_logic;
+    mac_data_o     : out std_logic_vector(7 downto 0);
+    -- ctrl
+    ctrl_address_o : out std_logic_vector(ctrl_address_width_g-1 downto 0);
+    ctrl_data_o    : out std_logic_vector(ctrl_data_width_g-1 downto 0);
+    ctrl_data_i    : in  std_logic_vector(ctrl_data_width_g-1 downto 0);
+    ctrl_strobe_o  : out std_logic;
+    ctrl_write_o   : out std_logic;
+    ctrl_ack_i     : in  std_logic);
 end entity eth_subsystem;
 
 architecture rtl of eth_subsystem is
@@ -172,6 +182,32 @@ architecture rtl of eth_subsystem is
         ctrl_data_i  : in  std_logic_vector(7 downto 0));
     end component eth_udp;
 
+    component eth_ctrl is
+    generic (
+        address_width_g : positive;
+        data_width_g    : positive);
+    port (
+        clk_i       : in  std_logic;
+        reset_i     : in  std_logic;
+        -- udp tx
+        udp_valid_o : out std_logic;
+        udp_ready_i : in  std_logic;
+        udp_last_o  : out std_logic;
+        udp_data_o  : out std_logic_vector(7 downto 0);
+        -- udp rx
+        udp_valid_i : in  std_logic;
+        udp_ready_o : out std_logic;
+        udp_last_i  : in  std_logic;
+        udp_data_i  : in  std_logic_vector(7 downto 0);
+        -- ctrl bus
+        address_o   : out std_logic_vector(address_width_g-1 downto 0);
+        data_o      : out std_logic_vector(data_width_g-1 downto 0);
+        data_i      : in  std_logic_vector(data_width_g-1 downto 0);
+        strobe_o    : out std_logic;
+        write_o     : out std_logic;
+        ack_i       : in  std_logic);
+    end component eth_ctrl;
+
     signal arp_rx_valid  : std_logic;
     signal arp_rx_ready  : std_logic;
     signal arp_rx_last   : std_logic;
@@ -192,10 +228,15 @@ architecture rtl of eth_subsystem is
     signal udp_rx_last   : std_logic;
     signal udp_rx_data   : std_logic_vector(7 downto 0);
 
-    signal ctrl_valid    : std_logic;
-    signal ctrl_ready    : std_logic;
-    signal ctrl_last     : std_logic;
-    signal ctrl_data     : std_logic_vector(7 downto 0);
+    signal ctrl_rx_valid : std_logic;
+    signal ctrl_rx_ready : std_logic;
+    signal ctrl_rx_last  : std_logic;
+    signal ctrl_rx_data  : std_logic_vector(7 downto 0);
+
+    signal ctrl_tx_valid : std_logic;
+    signal ctrl_tx_ready : std_logic;
+    signal ctrl_tx_last  : std_logic;
+    signal ctrl_tx_data  : std_logic_vector(7 downto 0);
 
     signal udp_tx_valid  : std_logic;
     signal udp_tx_ready  : std_logic;
@@ -221,6 +262,11 @@ architecture rtl of eth_subsystem is
     signal mac_valid     : std_logic;
     signal mac_last      : std_logic;
     signal mac_data      : std_logic_vector(7 downto 0);
+
+    signal ctrl_address : std_logic_vector(ctrl_address_width_g-1 downto 0);
+    signal ctrl_data    : std_logic_vector(ctrl_data_width_g-1 downto 0);
+    signal ctrl_strobe  : std_logic;
+    signal ctrl_write   : std_logic;
 
 begin
 
@@ -348,19 +394,49 @@ begin
         udp_last_o   => udp_tx_last,
         udp_data_o   => udp_tx_data,
         -- ctrl rx
-        ctrl_valid_o => ctrl_valid,
-        ctrl_ready_i => ctrl_ready,
-        ctrl_last_o  => ctrl_last,
-        ctrl_data_o  => ctrl_data,
+        ctrl_valid_o => ctrl_rx_valid,
+        ctrl_ready_i => ctrl_rx_ready,
+        ctrl_last_o  => ctrl_rx_last,
+        ctrl_data_o  => ctrl_rx_data,
         -- ctrl tx
-        ctrl_valid_i => ctrl_valid,
-        ctrl_ready_o => ctrl_ready,
-        ctrl_last_i  => ctrl_last,
-        ctrl_data_i  => ctrl_data);
+        ctrl_valid_i => ctrl_tx_valid,
+        ctrl_ready_o => ctrl_tx_ready,
+        ctrl_last_i  => ctrl_tx_last,
+        ctrl_data_i  => ctrl_tx_data);
+
+    i_ctrl : eth_ctrl
+    generic map (
+        address_width_g => ctrl_address_width_g,
+        data_width_g    => ctrl_data_width_g)
+    port map (
+        clk_i       => clk_i,
+        reset_i     => reset_i,
+        -- udp tx
+        udp_valid_o => ctrl_tx_valid,
+        udp_ready_i => ctrl_tx_ready,
+        udp_last_o  => ctrl_tx_last,
+        udp_data_o  => ctrl_tx_data,
+        -- udp rx
+        udp_valid_i => ctrl_rx_valid,
+        udp_ready_o => ctrl_rx_ready,
+        udp_last_i  => ctrl_rx_last,
+        udp_data_i  => ctrl_rx_data,
+        -- ctrl bus
+        address_o   => ctrl_address,
+        data_o      => ctrl_data,
+        data_i      => ctrl_data_i,
+        strobe_o    => ctrl_strobe,
+        write_o     => ctrl_write,
+        ack_i       => ctrl_ack_i);
 
     mac_ready_o <= mac_ready;
     mac_valid_o <= mac_valid;
     mac_last_o <= mac_last;
     mac_data_o <= mac_data;
+
+    ctrl_address_o <= ctrl_address;
+    ctrl_data_o <= ctrl_data;
+    ctrl_strobe_o <= ctrl_strobe;
+    ctrl_write_o <= ctrl_write;
 
 end rtl;

@@ -61,8 +61,7 @@ int RegisterAccess::read(quint32 address, QVector<quint8> &data, int length)
         return AUDIO_PACKET_LENGTH_ERROR;
     }
     for (int index=0; index<receiveLength; index++) {
-
-        data.append(static_cast<quint8>(receiveData[index+2]));
+        data.append(static_cast<quint8>(receiveData[index+3]));
     }
 
     return AUDIO_SUCCESS;

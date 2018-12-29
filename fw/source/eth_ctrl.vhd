@@ -40,15 +40,15 @@ end entity eth_ctrl;
 
 architecture rtl of eth_ctrl is
 
-    constant command_write_c         : std_logic_vector(7 downto 0) := x"01";
-    constant command_read_c          : std_logic_vector(7 downto 0) := x"02";
+    constant command_read_c          : std_logic_vector(7 downto 0) := x"01";
+    constant command_write_c         : std_logic_vector(7 downto 0) := x"02";
     constant command_read_response_c : std_logic_vector(7 downto 0) := x"04";
     constant command_read_timeout_c  : std_logic_vector(7 downto 0) := x"08";
 
-    type rx_fsm_t is (idle_s, command_s, addr_size_s, addr_s, data_size_s,
+    type rx_fsm_t is (idle_s, id_s, command_s, addr_size_s, addr_s, data_size_s,
                       write_s, read_s, wait_for_done_s, wait_for_end_s);
 
-    type tx_fsm_t is (idle_s, id_s, command_s, data_size_s, data_s);
+    type tx_fsm_t is (idle_s, packet_nr_s, id_s, command_s, data_size_s, data_s);
 
     signal rx_fsm_r          : rx_fsm_t := idle_s;
     signal udp_ready_r       : std_logic := '0';
@@ -57,6 +57,7 @@ architecture rtl of eth_ctrl is
     signal tx_data_r         : std_logic_vector(data_width_g-1 downto 0) := (others => '0');
     signal strobe_r          : std_logic := '0';
     signal write_r           : std_logic := '0';
+    signal packet_number_r   : std_logic_vector(7 downto 0) := (others => '0');
     signal id_r              : std_logic_vector(7 downto 0) := (others => '0');
     signal command_write_r   : std_logic := '0';
     signal command_read_r    : std_logic := '0';
@@ -87,7 +88,13 @@ begin
                     command_read_r <= '0';
                     udp_ready_r <= '1';
                     address_r <= (others => '0');
-                    if (udp_ready_r = '1') and (udp_valid_i = '1') then
+                    if ((udp_ready_r = '1') and (udp_valid_i = '1')) then
+                        packet_number_r <= udp_data_i;
+                        rx_fsm_r <= id_s;
+                    end if;
+
+                when id_s =>
+                    if (udp_valid_i = '1') then
                         id_r <= udp_data_i;
                         rx_fsm_r <= command_s;
                     end if;
@@ -185,13 +192,22 @@ begin
                         tx_data_r <= data_i;
                     end if;
                     if ((send_response_r = '1') and (response_done_r = '0')) then
-                        timeout_counter_r <= timeout_counter_r + 1;
+                        if (timeout_counter_r(timeout_counter_r'high) = '0') then
+                            timeout_counter_r <= timeout_counter_r + 1;
+                        end if;
                     else
                         timeout_counter_r <= (others => '0');
                     end if;
                     if ((timeout_counter_r(timeout_counter_r'high) = '1') and (response_done_r = '0')) then
-                        tx_fsm_r <= id_s;
+                        tx_fsm_r <= packet_nr_s;
                     elsif ((send_response_r = '1') and (ack_i = '1')) then
+                        tx_fsm_r <= packet_nr_s;
+                    end if;
+
+                when packet_nr_s =>
+                    udp_valid_r <= '1';
+                    udp_data_r <= packet_number_r;
+                    if (udp_ready_i = '1') then
                         tx_fsm_r <= id_s;
                     end if;
 
