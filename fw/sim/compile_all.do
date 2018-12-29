@@ -10,6 +10,7 @@ if { $::argc != 1 } {
     vcom ../source/fpga_pkg.vhd -check_synthesis
     vcom ../source/fifo.vhd -check_synthesis
     vcom ../source/ram.vhd -check_synthesis
+    vcom ../source/registerbank.vhd -check_synthesis
 
     # eth mac
     vcom ../source/rmii_interface.vhd -check_synthesis
@@ -25,6 +26,7 @@ if { $::argc != 1 } {
     vcom ../source/eth_ip.vhd -check_synthesis
     vcom ../source/eth_icmp.vhd -check_synthesis
     vcom ../source/eth_udp.vhd -check_synthesis
+    vcom ../source/eth_ctrl.vhd -check_synthesis
 
     # biquad
     vcom ../source/biquad_data_mem.vhd -check_synthesis
@@ -55,6 +57,7 @@ if { $::argc != 1 } {
     vcom ../testbench/rmii_interface_tb.vhd
     vcom ../testbench/eth_mac_tb.vhd
     vcom ../testbench/eth_subsystem_tb.vhd
+    vcom ../testbench/registerbank_tb.vhd
 
     # start simulation
     set tbName $1

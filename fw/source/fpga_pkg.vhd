@@ -18,6 +18,8 @@ package fpga_pkg is
     constant ALL_ZEROS : std_logic_vector(1023 downto 0) := (others => '0');
     constant ALL_ONES  : std_logic_vector(1023 downto 0) := (others => '1');
 
+    type std_logic_array_32 is array (natural range <>) of std_logic_vector(31 downto 0);
+
 end fpga_pkg;
 
 package body fpga_pkg is

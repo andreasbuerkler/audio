@@ -162,7 +162,7 @@ begin
                 if (eth_last_i = '1') then
                     rx_checksum_r <= (others => '0');
                 elsif ((rx_add_en_r = '1') and (rx_offset_counter_r(0) = '0')) then
-                    rx_checksum_v := resize(unsigned(rx_checksum_r), 17) + unsigned(rx_shift_r(7 downto 0) & eth_data_i);
+                    rx_checksum_v := resize(unsigned(rx_checksum_r), 17) + (unsigned(rx_shift_r(7 downto 0)) & unsigned(eth_data_i));
                     if (rx_checksum_v(rx_checksum_v'high) = '1') then
                         rx_checksum_r <= std_logic_vector(rx_checksum_v(rx_checksum_r'range) + 1);
                     else
@@ -295,7 +295,7 @@ begin
                 when size_icmp_s =>
                     if (icmp_valid_i = '1') then
                         if (tx_offset_counter_r(tx_offset_counter_r'high) = '1') then
-                            packet_length_v := unsigned(tx_length_r & icmp_data_i) + unsigned(header_length_c & "00");
+                            packet_length_v := (unsigned(tx_length_r) & unsigned(icmp_data_i)) + (unsigned(header_length_c) & to_unsigned(0, 2));
                             tx_data_shift_r <= ip_version_c & header_length_c & type_of_service_c & std_logic_vector(packet_length_v);
                             tx_icmp_ready_r <= '0';
                             tx_ip_read_en_r <= '1';
@@ -311,7 +311,7 @@ begin
                 when size_udp_s =>
                     if (udp_valid_i = '1') then
                         if (tx_offset_counter_r(tx_offset_counter_r'high) = '1') then
-                            packet_length_v := unsigned(tx_length_r & udp_data_i) + unsigned(header_length_c & "00");
+                            packet_length_v := (unsigned(tx_length_r) & unsigned(udp_data_i)) + (unsigned(header_length_c) & to_unsigned(0, 2));
                             tx_data_shift_r <= ip_version_c & header_length_c & type_of_service_c & std_logic_vector(packet_length_v);
                             tx_udp_ready_r <= '0';
                             tx_ip_read_en_r <= '1';
