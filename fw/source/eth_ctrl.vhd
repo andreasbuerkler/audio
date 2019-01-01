@@ -45,43 +45,52 @@ architecture rtl of eth_ctrl is
     constant command_read_response_c : std_logic_vector(7 downto 0) := x"04";
     constant command_read_timeout_c  : std_logic_vector(7 downto 0) := x"08";
 
+    constant bytes_per_transfer_c    : positive := data_width_g / 8;
+
     type rx_fsm_t is (idle_s, id_s, command_s, addr_size_s, addr_s, data_size_s,
                       write_s, read_s, wait_for_done_s, wait_for_end_s);
 
-    type tx_fsm_t is (idle_s, packet_nr_s, id_s, command_s, data_size_s, data_s);
+    type tx_fsm_t is (idle_s, packet_nr_s, id_s, command_s,
+                      data_size_s, data_s, last_byte_s, wait_for_next_byte_s);
 
-    signal rx_fsm_r          : rx_fsm_t := idle_s;
-    signal udp_ready_r       : std_logic := '0';
-    signal address_r         : std_logic_vector(address_width_g-1 downto 0) := (others => '0');
-    signal rx_data_r         : std_logic_vector(data_width_g-1 downto 0) := (others => '0');
-    signal tx_data_r         : std_logic_vector(data_width_g-1 downto 0) := (others => '0');
-    signal strobe_r          : std_logic := '0';
-    signal write_r           : std_logic := '0';
-    signal packet_number_r   : std_logic_vector(7 downto 0) := (others => '0');
-    signal id_r              : std_logic_vector(7 downto 0) := (others => '0');
-    signal command_write_r   : std_logic := '0';
-    signal command_read_r    : std_logic := '0';
-    signal size_counter_r    : unsigned(7 downto 0) := (others => '0');
-    signal send_response_r   : std_logic := '0';
+    signal rx_fsm_r             : rx_fsm_t := idle_s;
+    signal udp_ready_r          : std_logic := '0';
+    signal address_r            : std_logic_vector(address_width_g-1 downto 0) := (others => '0');
+    signal rx_data_r            : std_logic_vector(data_width_g-1 downto 0) := (others => '0');
+    signal tx_data_r            : std_logic_vector(data_width_g-1 downto 0) := (others => '0');
+    signal strobe_r             : std_logic := '0';
+    signal write_r              : std_logic := '0';
+    signal packet_number_r      : std_logic_vector(7 downto 0) := (others => '0');
+    signal id_r                 : std_logic_vector(7 downto 0) := (others => '0');
+    signal command_write_r      : std_logic := '0';
+    signal command_read_r       : std_logic := '0';
+    signal size_counter_r       : unsigned(7 downto 0) := (others => '0');
+    signal send_response_r      : std_logic := '0';
 
-    signal tx_fsm_r          : tx_fsm_t := idle_s;
-    signal udp_valid_r       : std_logic := '0';
-    signal udp_last_r        : std_logic := '0';
-    signal udp_data_r        : std_logic_vector(7 downto 0) := (others => '0');
-    signal timeout_counter_r : unsigned(9 downto 0) := (others => '0');
-    signal data_counter_r    : unsigned(1 downto 0) := (others => '0');
-    signal response_done_r   : std_logic := '0';
+    signal tx_fsm_r             : tx_fsm_t := idle_s;
+    signal udp_valid_r          : std_logic := '0';
+    signal udp_last_r           : std_logic := '0';
+    signal udp_data_r           : std_logic_vector(7 downto 0) := (others => '0');
+    signal timeout_counter_r    : unsigned(9 downto 0) := (others => '0');
+    signal timeout_counter_en_r : std_logic := '0';
+    signal timeout_active_r     : std_logic := '0';
+    signal data_counter_r       : unsigned(log2ceil(bytes_per_transfer_c)-1 downto 0) := (others => '0');
+    signal response_done_r      : std_logic := '0';
+    signal tx_size_r            : unsigned(8 downto 0) := (others => '0');
+    signal tx_request_next_r    : std_logic := '0';
+    signal ack_r                : std_logic := '0';
 
 begin
 
     assert (data_width_g = 32) report "only 32 bit data width supported" severity error;
+    assert ((address_width_g mod 8) = 0) report "only multiple of 8 bit address width supported" severity error;
 
     rx_proc : process (clk_i)
     begin
         if (rising_edge(clk_i)) then
             strobe_r <= '0';
             write_r <= '0';
-                    
+
             case (rx_fsm_r) is
                 when idle_s =>
                     command_write_r <= '0';
@@ -113,8 +122,8 @@ begin
                     end if;
 
                 when addr_size_s =>
+                    size_counter_r <= unsigned(udp_data_i);
                     if (udp_valid_i = '1') then
-                        size_counter_r <= unsigned(udp_data_i);
                         rx_fsm_r <= addr_s;
                     end if;
 
@@ -123,30 +132,33 @@ begin
                         size_counter_r <= size_counter_r - 1;
                         address_r <= address_r(address_r'high-8 downto 0) & udp_data_i;
                         if (size_counter_r = to_unsigned(1, size_counter_r'length)) then
-                            if (command_write_r = '1') then
-                                rx_fsm_r <= data_size_s;
-                            elsif (command_read_r = '1') then
-                                udp_ready_r <= '0';
-                                rx_fsm_r <= read_s;
-                            else
-                                rx_fsm_r <= wait_for_end_s;
-                            end if;
+                            rx_fsm_r <= data_size_s;
                         end if;
                     end if;
 
                 when data_size_s =>
+                    size_counter_r <= unsigned(udp_data_i);
                     if (udp_valid_i = '1') then
-                        size_counter_r <= unsigned(udp_data_i);
-                        rx_fsm_r <= write_s;
+                        if (command_write_r = '1') then
+                            rx_fsm_r <= write_s;
+                        elsif (command_read_r = '1') then
+                            udp_ready_r <= '0';
+                            rx_fsm_r <= read_s;
+                        else
+                            rx_fsm_r <= wait_for_end_s;
+                        end if;
                     end if;
 
                 when write_s =>
                     if (udp_valid_i = '1') then
                         size_counter_r <= size_counter_r - 1;
                         rx_data_r <= rx_data_r(rx_data_r'high-8 downto 0) & udp_data_i;
-                        if (size_counter_r(1 downto 0) = "01") then
+                        if (size_counter_r(1 downto 0) = "01") then -- TODO: only for 32 bit data
                             strobe_r <= '1';
                             write_r <= '1';
+                        end if;
+                        if (strobe_r = '1') then
+                            address_r <= std_logic_vector(unsigned(address_r) + bytes_per_transfer_c);
                         end if;
                         if (size_counter_r = to_unsigned(1, size_counter_r'length)) then
                             if (udp_last_i = '1') then
@@ -168,7 +180,10 @@ begin
                     else
                         send_response_r <= '1';
                     end if;
-
+                    if (tx_request_next_r = '1') then
+                        address_r <= std_logic_vector(unsigned(address_r) + bytes_per_transfer_c);
+                        strobe_r <= '1';
+                    end if;
                 when wait_for_end_s =>
                     if ((udp_valid_i = '1') and (udp_last_i = '1')) then
                         rx_fsm_r <= idle_s;
@@ -178,29 +193,38 @@ begin
         end if;
     end process rx_proc;
 
+    timeout_proc : process (clk_i)
+    begin
+        if (rising_edge(clk_i)) then
+            if (timeout_counter_en_r = '1') then
+                if (timeout_counter_r(timeout_counter_r'high) = '0') then
+                    timeout_counter_r <= timeout_counter_r + 1;
+                end if;
+            else
+                timeout_counter_r <= (others => '0');
+            end if;
+        end if;
+    end process timeout_proc;
+
     tx_proc : process (clk_i)
     begin
         if (rising_edge(clk_i)) then
             udp_valid_r <= '0';
             udp_last_r <= '0';
             response_done_r <= '0';
+            tx_request_next_r <= '0';
 
             case (tx_fsm_r) is
                 when idle_s =>
-                    data_counter_r <= "11";
+                    data_counter_r <= to_unsigned(bytes_per_transfer_c-1, data_counter_r'length);
+                    tx_size_r <= '0' & size_counter_r;
                     if (ack_i = '1') then
                         tx_data_r <= data_i;
                     end if;
-                    if ((send_response_r = '1') and (response_done_r = '0')) then
-                        if (timeout_counter_r(timeout_counter_r'high) = '0') then
-                            timeout_counter_r <= timeout_counter_r + 1;
-                        end if;
-                    else
-                        timeout_counter_r <= (others => '0');
-                    end if;
-                    if ((timeout_counter_r(timeout_counter_r'high) = '1') and (response_done_r = '0')) then
-                        tx_fsm_r <= packet_nr_s;
-                    elsif ((send_response_r = '1') and (ack_i = '1')) then
+
+                    timeout_counter_en_r <= send_response_r;
+                    timeout_active_r <= timeout_counter_r(timeout_counter_r'high);
+                    if ((timeout_counter_r(timeout_counter_r'high) = '1') or ((send_response_r = '1') and (ack_i = '1'))) then
                         tx_fsm_r <= packet_nr_s;
                     end if;
 
@@ -220,7 +244,7 @@ begin
 
                 when command_s =>
                     udp_valid_r <= '1';
-                    if (timeout_counter_r(timeout_counter_r'high) = '1') then
+                    if (timeout_active_r = '1') then
                         udp_data_r <= command_read_timeout_c;
                         udp_last_r <= '1';
                         if (udp_ready_i = '1') then
@@ -236,23 +260,50 @@ begin
 
                 when data_size_s =>
                     udp_valid_r <= '1';
-                    udp_data_r <= std_logic_vector(to_unsigned(4, udp_data_r'length)); -- TODO: currently only 32bit read supported
+                    udp_data_r <= std_logic_vector(tx_size_r(udp_data_r'range));
                     if (udp_ready_i = '1') then
+                        tx_size_r <= tx_size_r - (bytes_per_transfer_c + 1);
                         tx_fsm_r <= data_s;
                     end if;
 
                 when data_s =>
+                    ack_r <= '0';
                     udp_valid_r <= '1';
-                    udp_data_r <= tx_data_r(31 downto 24);
-                    if (data_counter_r = "00") then
-                        udp_last_r <= '1';
-                    end if;
+                    udp_data_r <= tx_data_r(tx_data_r'high downto tx_data_r'high-7);
                     if (udp_ready_i = '1') then
-                        data_counter_r <= data_counter_r - 1;
                         tx_data_r <= tx_data_r(tx_data_r'high-8 downto 0) & x"00";
-                        if (data_counter_r = "00") then
+                        data_counter_r <= data_counter_r - 1;
+                        if (data_counter_r = to_unsigned(1, data_counter_r'length)) then
+                            if (tx_size_r(tx_size_r'high) = '0') then
+                                tx_request_next_r <= '1';
+                            end if;
+                            tx_fsm_r <= last_byte_s;
+                        end if;
+                    end if;
+
+                when last_byte_s =>
+                    udp_data_r <= tx_data_r(tx_data_r'high downto tx_data_r'high-7);
+                    tx_fsm_r <= wait_for_next_byte_s;
+
+                when wait_for_next_byte_s =>
+                    data_counter_r <= to_unsigned(bytes_per_transfer_c-1, data_counter_r'length);
+                    timeout_counter_en_r <= not timeout_counter_r(timeout_counter_r'high);
+                    if (ack_i = '1') then
+                        ack_r <= '1';
+                        tx_data_r <= data_i;
+                    end if;
+                    if ((tx_size_r(tx_size_r'high) = '1') or (timeout_counter_r(timeout_counter_r'high) = '1')) then
+                        udp_valid_r <= '1';
+                        udp_last_r <= '1';
+                        if (udp_ready_i = '1') then
                             response_done_r <= '1';
                             tx_fsm_r <= idle_s;
+                        end if;
+                    elsif (ack_r = '1') then
+                        udp_valid_r <= '1';
+                        if (udp_ready_i = '1') then
+                            tx_size_r <= tx_size_r - bytes_per_transfer_c;
+                            tx_fsm_r <= data_s;
                         end if;
                     end if;
 

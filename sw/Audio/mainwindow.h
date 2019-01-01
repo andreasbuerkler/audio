@@ -35,10 +35,12 @@ private slots:
     void onChangeSettingsButtonPressed();
     void onReadButtonPressed();
     void onWriteButtonPressed();
+    void onDebugButtonPressed();
 
 private:
     void setupSettings(QGroupBox *group);
     void setupRegister(QGroupBox *group);
+    void setupDebug(QGroupBox *group);
 
     UdpTransfer    _udptransfer;
     RegisterAccess _registerAccess;
@@ -58,11 +60,15 @@ private:
     QLineEdit      _addressField;
     QLineEdit      _dataField;
 
+    QPushButton    _debugButton;
+
     QGroupBox      *_settingsGroup;
     QGroupBox      *_registerGroup;
+    QGroupBox      *_debugGroup;
     QWidget        *_centralWidget;
     QGridLayout    *_settingsLayout;
     QGridLayout    *_registerLayout;
+    QGridLayout    *_debugLayout;
     QGridLayout    *_mainLayout;
 
     Ui::MainWindow *_ui;

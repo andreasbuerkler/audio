@@ -26,11 +26,14 @@ MainWindow::MainWindow(QWidget *parent) :
     _writeButton("Write"),
     _addressField(),
     _dataField(),
+    _debugButton("Debug"),
     _settingsGroup(new QGroupBox("Settings")),
     _registerGroup(new QGroupBox("Register read/write")),
+    _debugGroup(new QGroupBox("Debug")),
     _centralWidget(new QWidget(this)),
     _settingsLayout(new QGridLayout()),
     _registerLayout(new QGridLayout()),
+    _debugLayout(new QGridLayout()),
     _mainLayout(new QGridLayout(_centralWidget)),
     _ui(new Ui::MainWindow)
 {
@@ -44,9 +47,11 @@ MainWindow::MainWindow(QWidget *parent) :
     // create layout
     setupSettings(_settingsGroup);
     setupRegister(_registerGroup);
+    setupDebug(_debugGroup);
 
     _mainLayout->addWidget(_settingsGroup, 0, 0);
     _mainLayout->addWidget(_registerGroup, 1, 0);
+    _mainLayout->addWidget(_debugGroup, 2, 0);
 
     setCentralWidget(_centralWidget);
     setWindowTitle("Audio Control");
@@ -57,9 +62,11 @@ MainWindow::~MainWindow()
 {
   //delete _settingsGroup;
   //delete _registerGroup;
+  //delete _debugGroup;
   //delete _centralWidget;
   //delete _settingsLayout;
   //delete _registerLayout;
+  //delete _debugLayout;
     delete _ui;
 }
 
@@ -107,9 +114,18 @@ void MainWindow::setupRegister(QGroupBox *group)
     connect(&_writeButton, SIGNAL (released()), this, SLOT (onWriteButtonPressed()));
 }
 
+void MainWindow::setupDebug(QGroupBox *group)
+{
+    _debugLayout->addWidget(&_debugButton, 0, 0);
+    group->setLayout(_debugLayout);
+
+    connect(&_debugButton, SIGNAL (released()), this, SLOT (onDebugButtonPressed()));
+}
+
 void MainWindow::onChangeSettingsButtonPressed()
 {
     bool settingsChanged = false;
+
     _ipAddressField.setReadOnly(!_ipAddressField.isReadOnly());
     _ipAddressField.setFrame(!_ipAddressField.hasFrame());
     _portField.setReadOnly(!_portField.isReadOnly());
@@ -142,16 +158,11 @@ void MainWindow::onReadButtonPressed()
     if (!addressOk) {
         error = AUDIO_ADDRESS_FORMAT_ERROR;
     } else {
-        QVector<quint8> dataVector;
+        QVector<quint32> dataVector;
         QString dataString;
-        quint32 data;
-        error = _registerAccess.read(address, dataVector, 4);
+        error = _registerAccess.read(address, dataVector, 1);
         if (error == AUDIO_SUCCESS) {
-            data = (static_cast<quint32>(dataVector[0])<<24) |
-                   (static_cast<quint32>(dataVector[1])<<16) |
-                   (static_cast<quint32>(dataVector[2])<<8) |
-                    static_cast<quint32>(dataVector[3]);
-            dataString.setNum(data, 16);
+            dataString.setNum(dataVector.at(0), 16);
             _dataField.setText(dataString);
         }
     }
@@ -171,11 +182,74 @@ void MainWindow::onWriteButtonPressed()
     } else if (!dataOk) {
         error = AUDIO_DATA_FORMAT_ERROR;
     } else {
-        QVector<quint8> dataVector;
-        for (int byte=3; byte>=0; byte--) {
-            dataVector.append(static_cast<quint8>((data>>(8*byte)) & 0xff));
-        }
+        QVector<quint32> dataVector;
+        dataVector.append(data);
         error =_registerAccess.write(address, dataVector);
     }
     statusBar()->showMessage(QString("Register write ") + QString(errorToString(error)), 2000);
+}
+
+void MainWindow::onDebugButtonPressed()
+{
+    // test consecutive read write access
+    int error = AUDIO_SUCCESS;
+
+    QVector<quint32> writeVector;
+    writeVector.append(0x46580465);
+    writeVector.append(0xab678923);
+    writeVector.append(0x890bc892);
+    writeVector.append(0xe7890138);
+    writeVector.append(0xf082789a);
+    writeVector.append(0xb798b012);
+    writeVector.append(0x05df4081);
+    writeVector.append(0x7db89019);
+    writeVector.append(0xab673015);
+    writeVector.append(0x169ba201);
+    writeVector.append(0x48c36016);
+    writeVector.append(0x98f29543);
+    writeVector.append(0x096fb921);
+    writeVector.append(0x95ac2098);
+    writeVector.append(0x76b12afc);
+    error =_registerAccess.write(0x4, writeVector);
+    if (error != AUDIO_SUCCESS) {
+        statusBar()->showMessage(QString("Debug write ") + QString(errorToString(error)), 2000);
+        return;
+    }
+    QVector<quint32> readVector;
+    error = _registerAccess.read(0x4, readVector, 15);
+    if (error != AUDIO_SUCCESS) {
+        statusBar()->showMessage(QString("Debug read ") + QString(errorToString(error)), 2000);
+        return;
+    }
+    if (writeVector.length() != readVector.length()) {
+        statusBar()->showMessage(QString("Debug length ") + QString(errorToString(error)), 2000);
+        return;
+    }
+    for (int i=0; i<15; i++) {
+        if (writeVector.at(i) != readVector.at(i)) {
+            statusBar()->showMessage(QString("Debug compare ") + QString(errorToString(error)), 2000);
+            return;
+        }
+    }
+    for (int i=0; i<1000;i++) {
+        QVector<quint32> singleWriteVector;
+        singleWriteVector.append(static_cast<quint32>(i));
+        error =_registerAccess.write(0x4, singleWriteVector);
+        if (error != AUDIO_SUCCESS) {
+            statusBar()->showMessage(QString("Debug write ") + QString(errorToString(error)), 2000);
+            return;
+        }
+        QVector<quint32> singleReadVector;
+        error = _registerAccess.read(0x4, singleReadVector, 1);
+        if (error != AUDIO_SUCCESS) {
+            statusBar()->showMessage(QString("Debug read ") + QString(errorToString(error)), 2000);
+            return;
+        }
+        if (static_cast<quint32>(i) != singleReadVector.at(0)) {
+            statusBar()->showMessage(QString("Debug write iteration ") + QString(errorToString(error)), 2000);
+            return;
+        }
+    }
+
+    statusBar()->showMessage(QString("Debug ") + QString(errorToString(error)), 2000);
 }

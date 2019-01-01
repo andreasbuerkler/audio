@@ -135,6 +135,8 @@ architecture rtl of audio_top is
     generic (
         register_count_g : positive;
         register_init_g  : std_logic_array_32;
+        register_mask_g  : std_logic_array_32;
+        read_only_g      : std_logic_vector;
         data_width_g     : positive;
         address_width_g  : positive);
     port (
@@ -171,10 +173,16 @@ architecture rtl of audio_top is
                                                    x"06_10" &
                                                    x"07_02";
 
-    constant register_count_c : positive := 16;
-    constant register_init_c  : std_logic_array_32(register_count_c-1 downto 0) :=
-                               (0      => x"BEEF0123",
-                                others => x"00000000");
+    constant register_count_c     : positive := 16;
+    constant register_init_c      : std_logic_array_32(register_count_c-1 downto 0) :=
+                                   (0      => x"BEEF0123",
+                                    others => x"00000000");
+    constant register_read_only_c : std_logic_vector(register_count_c-1 downto 0) :=
+                                   (0      => '1',
+                                    others => '0');
+    constant register_mask_c      : std_logic_array_32(register_count_c-1 downto 0) :=
+                                   (0      => x"ffffffff",
+                                    others => x"ffffffff");
 
     -- reset
     signal reset_counter_r       : unsigned(23 downto 0) := (others => '0');
@@ -339,6 +347,8 @@ begin
     generic map (
         register_count_g => register_count_c,
         register_init_g  => register_init_c,
+        register_mask_g  => register_mask_c,
+        read_only_g      => register_read_only_c,
         data_width_g     => ctrl_data_width_c,
         address_width_g  => ctrl_address_width_c-2)
     port map (

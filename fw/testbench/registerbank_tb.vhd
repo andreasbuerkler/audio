@@ -47,6 +47,8 @@ architecture rtl of registerbank_tb is
     generic (
         register_count_g : positive;
         register_init_g  : std_logic_array_32;
+        register_mask_g  : std_logic_array_32;
+        read_only_g      : std_logic_vector;
         data_width_g     : positive;
         address_width_g  : positive);
     port (
@@ -69,6 +71,7 @@ architecture rtl of registerbank_tb is
     constant address_width_c  : positive := 16;
     constant data_width_c     : positive := 32;
     constant register_count_c : positive := 8;
+    constant read_only_c      : std_logic_vector(register_count_c-1 downto 0) := (others => '0');
     constant register_init_c  : std_logic_array_32(register_count_c-1 downto 0) :=
                                (x"00000000",
                                 x"00000001",
@@ -78,6 +81,8 @@ architecture rtl of registerbank_tb is
                                 x"00000005",
                                 x"00000006",
                                 x"00000007");
+
+    constant register_mask_c : std_logic_array_32(register_count_c-1 downto 0) := (others => (others => '1'));
 
     constant command_read_c          : std_logic_vector(7 downto 0) := x"01";
     constant command_write_c         : std_logic_vector(7 downto 0) := x"02";
@@ -150,8 +155,10 @@ begin
     generic map (
         register_count_g => 8,
         register_init_g  => register_init_c,
+        register_mask_g  => register_mask_c,
+        read_only_g      => read_only_c,
         data_width_g     => data_width_c,
-        address_width_g  => address_width_c)
+        address_width_g  => address_width_c-2)
     port map (
         clk_i          => clk,
         reset_i        => '0',
@@ -161,7 +168,7 @@ begin
         data_o         => open,
         data_strb_o    => open,
         -- ctrl bus
-        ctrl_address_i => ctrl_address,
+        ctrl_address_i => ctrl_address(address_width_c-1 downto 2),
         ctrl_data_i    => ctrl_data_w,
         ctrl_data_o    => ctrl_data_r,
         ctrl_strobe_i  => ctrl_strobe,
@@ -183,7 +190,8 @@ begin
                               signal   last    : out std_logic;
                               signal   ready   : in  std_logic;
                               constant address : in  std_logic_vector(address_width_c-1 downto 0);
-                              constant wdata   : in  std_logic_vector(data_width_c-1 downto 0)) is 
+                              constant wdata   : in  std_logic_vector(data_width_c-1 downto 0);
+                              constant wlength : in  std_logic_vector(7 downto 0)) is 
         begin
             ctrl_wait_for_signal (ready);
             valid <= '1';
@@ -203,15 +211,17 @@ begin
             ctrl_wait_for_signal (ready);
             data <= address(7 downto 0); -- address lsb
             ctrl_wait_for_signal (ready);
-            data <= x"04"; -- data length
-            ctrl_wait_for_signal (ready);
-            data <= wdata(31 downto 24); -- data msb
-            ctrl_wait_for_signal (ready);
-            data <= wdata(23 downto 16);
-            ctrl_wait_for_signal (ready);
-            data <= wdata(15 downto 8);
-            ctrl_wait_for_signal (ready);
-            data <= wdata(7 downto 0); -- data lsb
+            data <= wlength; -- data length
+            for i in 0 to (to_integer(unsigned(wlength))/4)-1 loop
+                ctrl_wait_for_signal (ready);
+                data <= wdata(31 downto 24); -- data msb
+                ctrl_wait_for_signal (ready);
+                data <= wdata(23 downto 16);
+                ctrl_wait_for_signal (ready);
+                data <= wdata(15 downto 8);
+                ctrl_wait_for_signal (ready);
+                data <= wdata(7 downto 0); -- data lsb
+            end loop;
             last <= '1';
             ctrl_wait_for_signal (ready);
             last <= '0';
@@ -223,7 +233,8 @@ begin
                              signal   data    : out std_logic_vector(7 downto 0);
                              signal   last    : out std_logic;
                              signal   ready   : in  std_logic;
-                             constant address : in  std_logic_vector(address_width_c-1 downto 0)) is
+                             constant address : in  std_logic_vector(address_width_c-1 downto 0);
+                             constant rlength : in  std_logic_vector(7 downto 0)) is
         begin
             ctrl_wait_for_signal (ready);
             valid <= '1';
@@ -242,6 +253,8 @@ begin
             data <= address(15 downto 8);
             ctrl_wait_for_signal (ready);
             data <= address(7 downto 0); -- address lsb
+            ctrl_wait_for_signal (ready);
+            data <= rlength; -- read length
             last <= '1';
             ctrl_wait_for_signal (ready);
             last <= '0';
@@ -288,52 +301,67 @@ begin
         wait until rising_edge(clk);
         -- read init values
         for i in 0 to register_count_c-1 loop
-            address_v := std_logic_vector(to_unsigned(i, address_v'length));
-            ctrl_read(udp_rx_valid_r, udp_rx_data_r, udp_rx_last_r, udp_rx_ready, address_v);
+            address_v := std_logic_vector(to_unsigned(i*4, address_v'length));
+            ctrl_read(udp_rx_valid_r, udp_rx_data_r, udp_rx_last_r, udp_rx_ready, address_v, x"04");
             ctrl_wait_for_read_data (udp_tx_valid, udp_tx_data, udp_tx_last, read_data_v);
             assert (read_data_v = register_init_c(i)) report "read error" severity error;
             debug_data <= read_data_v;
         end loop;
         -- overwrite all registers
         for i in 0 to register_count_c-1 loop
-            address_v := std_logic_vector(to_unsigned(i, address_v'length));
+            address_v := std_logic_vector(to_unsigned(i*4, address_v'length));
             write_data_v := std_logic_vector(to_unsigned(i*20, write_data_v'length));
-            ctrl_write(udp_rx_valid_r, udp_rx_data_r, udp_rx_last_r, udp_rx_ready, address_v, write_data_v);
+            ctrl_write(udp_rx_valid_r, udp_rx_data_r, udp_rx_last_r, udp_rx_ready, address_v, write_data_v, x"04");
         end loop;
         -- read overwritten values
         for i in 0 to register_count_c-1 loop
-            address_v := std_logic_vector(to_unsigned(i, address_v'length));
-            ctrl_read(udp_rx_valid_r, udp_rx_data_r, udp_rx_last_r, udp_rx_ready, address_v);
+            address_v := std_logic_vector(to_unsigned(i*4, address_v'length));
+            ctrl_read(udp_rx_valid_r, udp_rx_data_r, udp_rx_last_r, udp_rx_ready, address_v, x"04");
             ctrl_wait_for_read_data (udp_tx_valid, udp_tx_data, udp_tx_last, read_data_v);
             assert (read_data_v = std_logic_vector(to_unsigned(i*20, write_data_v'length))) report "read error" severity error;
             debug_data <= read_data_v;
         end loop;
         -- test read timeout
-        address_v := std_logic_vector(to_unsigned(register_count_c, address_v'length));
-        ctrl_read(udp_rx_valid_r, udp_rx_data_r, udp_rx_last_r, udp_rx_ready, address_v);
+        address_v := std_logic_vector(to_unsigned(register_count_c*4, address_v'length));
+        ctrl_read(udp_rx_valid_r, udp_rx_data_r, udp_rx_last_r, udp_rx_ready, address_v, x"04");
         ctrl_wait_for_read_data (udp_tx_valid, udp_tx_data, udp_tx_last, read_data_v);
         debug_data <= read_data_v;
-        -- write 0x12345678 to adress 0x2
-        address_v := x"0002";
+        -- write 0x12345678 to adress 0x8
+        address_v := x"0008";
         write_data_v := x"12345678";
-        ctrl_write(udp_rx_valid_r, udp_rx_data_r, udp_rx_last_r, udp_rx_ready, address_v, write_data_v);
-        -- write 0xaabbccdd to adress 0x3
-        address_v := x"0003";
+        ctrl_write(udp_rx_valid_r, udp_rx_data_r, udp_rx_last_r, udp_rx_ready, address_v, write_data_v, x"04");
+        -- write 0xaabbccdd to adress 0xC
+        address_v := x"000C";
         write_data_v := x"aabbccdd";
-        ctrl_write(udp_rx_valid_r, udp_rx_data_r, udp_rx_last_r, udp_rx_ready, address_v, write_data_v);
+        ctrl_write(udp_rx_valid_r, udp_rx_data_r, udp_rx_last_r, udp_rx_ready, address_v, write_data_v, x"04");
         wait until rising_edge(clk);
-        -- read address 0x2
-        address_v := x"0002";
-        ctrl_read(udp_rx_valid_r, udp_rx_data_r, udp_rx_last_r, udp_rx_ready, address_v);
+        -- read address 0x8
+        address_v := x"0008";
+        ctrl_read(udp_rx_valid_r, udp_rx_data_r, udp_rx_last_r, udp_rx_ready, address_v, x"04");
         ctrl_wait_for_read_data (udp_tx_valid, udp_tx_data, udp_tx_last, read_data_v);
         debug_data <= read_data_v;
         assert (read_data_v = x"12345678") report "read error" severity error;
-        -- read address 0x3
-        address_v := x"0003";
-        ctrl_read(udp_rx_valid_r, udp_rx_data_r, udp_rx_last_r, udp_rx_ready, address_v);
+        -- read address 0xC
+        address_v := x"000C";
+        ctrl_read(udp_rx_valid_r, udp_rx_data_r, udp_rx_last_r, udp_rx_ready, address_v, x"04");
         ctrl_wait_for_read_data (udp_tx_valid, udp_tx_data, udp_tx_last, read_data_v);
         debug_data <= read_data_v;
         assert (read_data_v = x"aabbccdd") report "read error" severity error;
+        -- consecutive read of 8 words
+        address_v := x"0000";
+        ctrl_read(udp_rx_valid_r, udp_rx_data_r, udp_rx_last_r, udp_rx_ready, address_v, x"20");
+        ctrl_wait_for_read_data (udp_tx_valid, udp_tx_data, udp_tx_last, read_data_v);
+        -- consecutive write of 8 words
+        address_v := x"0000";
+        write_data_v := x"aabbccdd";
+        ctrl_write(udp_rx_valid_r, udp_rx_data_r, udp_rx_last_r, udp_rx_ready, address_v, write_data_v, x"20");
+        -- consecutive read with timeout
+        address_v := x"0004";
+        ctrl_read(udp_rx_valid_r, udp_rx_data_r, udp_rx_last_r, udp_rx_ready, address_v, x"20");
+        ctrl_wait_for_read_data (udp_tx_valid, udp_tx_data, udp_tx_last, read_data_v);
+        for i in 0 to 9 loop
+            wait until rising_edge(clk);
+        end loop;
         report "done";
         clk_en <= false;
         wait;

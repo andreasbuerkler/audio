@@ -16,6 +16,8 @@ entity registerbank is
 generic (
     register_count_g : positive := 8;
     register_init_g  : std_logic_array_32 := (0 => x"00000000");
+    register_mask_g  : std_logic_array_32 := (0 => x"ffffffff");
+    read_only_g      : std_logic_vector := (0 => '0');
     data_width_g     : positive := 32;
     address_width_g  : positive := 16);
 port (
@@ -50,13 +52,17 @@ begin
             data_strb_r <= (others => '0');
             for i in 0 to register_count_g-1 loop
                 if ((ctrl_strobe_i = '1') and (ctrl_write_i = '1')) then
-                    if (unsigned(ctrl_address_i) = to_unsigned(i, ctrl_address_i'length)) then
-                        register_r(i) <= ctrl_data_i;
+                    if ((unsigned(ctrl_address_i) = to_unsigned(i, ctrl_address_i'length)) and (read_only_g(i) = '0')) then
+                        for j in 0 to data_width_g-1 loop
+                            register_r(i)(j) <= ctrl_data_i(j) and register_mask_g(i)(j);
+                        end loop;
                         data_strb_r(i) <= '1';
                     end if;
                 else
                     if (data_strb_i(i) = '1') then
-                        register_r(i) <= data_i(i);
+                        for j in 0 to data_width_g-1 loop
+                            register_r(i)(j) <= data_i(i)(j) and register_mask_g(i)(j);
+                        end loop;
                     end if;
                 end if;
             end loop;
@@ -70,7 +76,9 @@ begin
             for i in 0 to register_count_g-1 loop
                 if ((ctrl_strobe_i = '1') and (ctrl_write_i = '0')) then
                     if (unsigned(ctrl_address_i) = to_unsigned(i, ctrl_address_i'length)) then
-                        ctrl_data_r <= register_r(i);
+                        for j in 0 to data_width_g-1 loop
+                            ctrl_data_r(j) <= register_r(i)(j) and register_mask_g(i)(j);
+                        end loop;
                         ctrl_ack_r <= '1';
                     end if;
                 end if;

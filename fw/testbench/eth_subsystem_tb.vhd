@@ -148,15 +148,15 @@ architecture rtl of eth_subsystem_tb is
                                                      x"05069ceb" &
                                                      x"e80e6c62" &
                                                      x"08004500" &
-                                                     x"00230002" &
+                                                     x"00240002" &
                                                      x"00008011" &
-                                                     x"b6ffc0a8" &
+                                                     x"b6fec0a8" &
                                                      x"0114c0a8" &
                                                      x"01640102" &
-                                                     x"1234000f" &
+                                                     x"12340010" &
                                                      x"00000701" &
                                                      x"04000000" &
-                                                     x"04";
+                                                     x"0404";
 
     constant response_udp_packet_c : std_logic_vector := x"9cebe80e" &
                                                          x"6c620102" &

@@ -120,6 +120,4 @@ void UdpTransfer::readyRead()
     _mutex.lock();
     _receiveBuffer.append(buffer);
     _mutex.unlock();
-
-    qDebug() << "Message: " << buffer;
 }
