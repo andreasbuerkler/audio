@@ -18,6 +18,8 @@
 #include "udptransfer.h"
 #include "registeraccess.h"
 #include "typedefinitions.h"
+#include "meter.h"
+#include "updater.h"
 
 namespace Ui {
     class MainWindow;
@@ -44,6 +46,7 @@ private:
 
     UdpTransfer    _udptransfer;
     RegisterAccess _registerAccess;
+    Updater        _updater;
     QPalette       _paletteActive;
     QPalette       _paletteInactive;
 
@@ -61,6 +64,7 @@ private:
     QLineEdit      _dataField;
 
     QPushButton    _debugButton;
+    IUpdateElement *_meter;
 
     QGroupBox      *_settingsGroup;
     QGroupBox      *_registerGroup;

@@ -11,8 +11,9 @@
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
-    _udptransfer(),
-    _registerAccess(_udptransfer),
+    _udptransfer(this),
+    _registerAccess(_udptransfer, this),
+    _updater(_registerAccess, this),
     _paletteActive(),
     _paletteInactive(),
     _ipAddressLabel("IP Address:"),
@@ -27,6 +28,7 @@ MainWindow::MainWindow(QWidget *parent) :
     _addressField(),
     _dataField(),
     _debugButton("Debug"),
+    _meter(new Meter()),
     _settingsGroup(new QGroupBox("Settings")),
     _registerGroup(new QGroupBox("Register read/write")),
     _debugGroup(new QGroupBox("Debug")),
@@ -117,7 +119,10 @@ void MainWindow::setupRegister(QGroupBox *group)
 void MainWindow::setupDebug(QGroupBox *group)
 {
     _debugLayout->addWidget(&_debugButton, 0, 0);
+    _debugLayout->addWidget(_meter, 1, 0);
     group->setLayout(_debugLayout);
+
+    _updater.addElement(0x0, _meter);
 
     connect(&_debugButton, SIGNAL (released()), this, SLOT (onDebugButtonPressed()));
 }

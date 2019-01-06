@@ -30,13 +30,18 @@ SOURCES += \
     main.cpp \
     mainwindow.cpp \
     udptransfer.cpp \
-    registeraccess.cpp
+    registeraccess.cpp \
+    meter.cpp \
+    updater.cpp
 
 HEADERS += \
     mainwindow.h \
     udptransfer.h \
     registeraccess.h \
-    typedefinitions.h
+    typedefinitions.h \
+    meter.h \
+    updater.h \
+    iupdateelement.h
 
 FORMS += \
     mainwindow.ui
