@@ -58,6 +58,7 @@ if { $::argc != 1 } {
     vcom ../testbench/eth_mac_tb.vhd
     vcom ../testbench/eth_subsystem_tb.vhd
     vcom ../testbench/registerbank_tb.vhd
+    vcom ../testbench/meter_tb.vhd
 
     # start simulation
     set tbName $1

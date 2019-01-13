@@ -22,7 +22,6 @@ private:
     QTimer _timer;
     QVector<QPair<IUpdateElement *, quint32>> _elementVector;
     RegisterAccess &_registerAccess;
-    int _testVal;
 };
 
 #endif // UPDATER_H

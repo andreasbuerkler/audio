@@ -147,6 +147,7 @@ architecture rtl of audio_top is
         data_strb_i    : in  std_logic_vector(register_count_g-1 downto 0);
         data_o         : out std_logic_array_32(register_count_g-1 downto 0);
         data_strb_o    : out std_logic_vector(register_count_g-1 downto 0);
+        read_strb_o    : out std_logic_vector(register_count_g-1 downto 0);
         -- ctrl bus
         ctrl_address_i : in  std_logic_vector(address_width_g-1 downto 0);
         ctrl_data_i    : in  std_logic_vector(data_width_g-1 downto 0);
@@ -155,6 +156,22 @@ architecture rtl of audio_top is
         ctrl_write_i   : in  std_logic;
         ctrl_ack_o     : out std_logic);
     end component registerbank;
+
+    component meter is
+    generic (
+        data_width_g : natural);
+    port (
+        audio_clk_i    : in  std_logic;
+        left_valid_i   : in  std_logic;
+        right_valid_i  : in  std_logic;
+        data_i         : in  std_logic_vector(data_width_g-1 downto 0);
+        register_clk_i : in  std_logic;
+        data_read_l_i  : in  std_logic;
+        data_read_r_i  : in  std_logic;
+        level_l_o      : out std_logic_vector(7 downto 0);
+        level_r_o      : out std_logic_vector(7 downto 0);
+        level_strobe_o : out std_logic);
+    end component meter;
 
     constant ctrl_address_width_c : positive := 16;
     constant ctrl_data_width_c    : positive := 32;
@@ -173,16 +190,24 @@ architecture rtl of audio_top is
                                                    x"06_10" &
                                                    x"07_02";
 
-    constant register_count_c     : positive := 16;
+    constant register_count_c              : positive := 16;
+    constant register_address_version_c    : natural  := 0;
+    constant register_address_in_meter_r_c : natural  := 1;
+    constant register_address_in_meter_l_c : natural  := 2;
+
     constant register_init_c      : std_logic_array_32(register_count_c-1 downto 0) :=
-                                   (0      => x"BEEF0123",
+                                   (register_address_version_c    => x"BEEF0123",
                                     others => x"00000000");
     constant register_read_only_c : std_logic_vector(register_count_c-1 downto 0) :=
-                                   (0      => '1',
-                                    others => '0');
+                                   (register_address_version_c    => '1',
+                                    register_address_in_meter_r_c => '1',
+                                    register_address_in_meter_l_c => '1',
+                                    others                        => '0');
     constant register_mask_c      : std_logic_array_32(register_count_c-1 downto 0) :=
-                                   (0      => x"ffffffff",
-                                    others => x"ffffffff");
+                                   (register_address_version_c    => x"ffffffff",
+                                    register_address_in_meter_r_c => x"000000ff",
+                                    register_address_in_meter_l_c => x"000000ff",
+                                    others                        => x"ffffffff");
 
     -- reset
     signal reset_counter_r       : unsigned(23 downto 0) := (others => '0');
@@ -231,6 +256,12 @@ architecture rtl of audio_top is
     -- registerbank
     signal register_read_data : std_logic_array_32(register_count_c-1 downto 0) := (others => (others => '0'));
     signal register_read_strb : std_logic_vector(register_count_c-1 downto 0) := (others => '0');
+    signal register_was_read  : std_logic_vector(register_count_c-1 downto 0);
+
+    -- input meter
+    signal in_meter_r_level : std_logic_vector(7 downto 0);
+    signal in_meter_l_level : std_logic_vector(7 downto 0);
+    signal in_meter_strobe  : std_logic;
 
 begin
 
@@ -359,6 +390,7 @@ begin
         data_strb_i    => register_read_strb,
         data_o         => open,
         data_strb_o    => open,
+        read_strb_o    => register_was_read,
         -- ctrl bus
         ctrl_address_i => ctrl_address(ctrl_address_width_c-1 downto 2),
         ctrl_data_i    => ctrl_data_out,
@@ -366,6 +398,27 @@ begin
         ctrl_strobe_i  => ctrl_strobe,
         ctrl_write_i   => ctrl_write,
         ctrl_ack_o     => ctrl_ack);
+
+    -- register bank read
+    register_read_data(register_address_in_meter_r_c)(in_meter_r_level'range) <= in_meter_r_level;
+    register_read_data(register_address_in_meter_l_c)(in_meter_l_level'range) <= in_meter_l_level;
+    register_read_strb(register_address_in_meter_r_c) <= in_meter_strobe;
+    register_read_strb(register_address_in_meter_l_c) <= in_meter_strobe;
+
+    i_input_meter : meter
+    generic map (
+        data_width_g => 24)
+    port map (
+        audio_clk_i    => clk12_288_i,
+        left_valid_i   => audio_l_valid,
+        right_valid_i  => audio_r_valid,
+        data_i         => audio_data,
+        register_clk_i => clk50_000_i,
+        data_read_l_i  => register_was_read(register_address_in_meter_l_c),
+        data_read_r_i  => register_was_read(register_address_in_meter_r_c),
+        level_l_o      => in_meter_l_level,
+        level_r_o      => in_meter_r_level,
+        level_strobe_o => in_meter_strobe);
 
     -- output signals
     led_n_o      <= led_n_r;

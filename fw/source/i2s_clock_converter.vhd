@@ -8,10 +8,10 @@
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
-  
+
 entity i2s_clock_converter is
 generic (
-    DATA_W : natural := 27);
+    DATA_W : natural := 24);
 port (
     in_clk_i      : in  std_logic;
     right_valid_i : in  std_logic;
@@ -27,6 +27,7 @@ architecture rtl of i2s_clock_converter is
 
     signal data_r              : std_logic_vector(DATA_W-1 downto 0) := (others => '0');
     signal left_r              : std_logic := '0';
+    signal right_r             : std_logic := '0';
     signal valid_toggle_r      : std_logic := '0';
 
     signal valid_toggle_vec_r  : std_logic_vector(2 downto 0) := (others => '0');
@@ -45,6 +46,7 @@ begin
             if ((right_valid_i = '1') or (left_valid_i = '1')) then
                 data_r <= data_i;
                 left_r <= left_valid_i;
+                right_r <= right_valid_i;
                 valid_toggle_r <= not valid_toggle_r;
             end if;
         end if;
@@ -58,14 +60,14 @@ begin
             valid_copy_r <= valid_toggle_copy_r xor valid_toggle_vec_r(valid_toggle_vec_r'high);
         end if;
     end process sync_proc;
-    
+
     out_proc : process (out_clk_i)
     begin
         if (rising_edge(out_clk_i)) then
             if (valid_copy_r = '1') then
                 data_out_r <= data_r;
                 left_valid_r <= left_r;
-                right_valid_r <= not left_r;
+                right_valid_r <= right_r;
             else
                 left_valid_r <= '0';
                 right_valid_r <= '0';

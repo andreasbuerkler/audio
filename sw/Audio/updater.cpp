@@ -16,14 +16,9 @@ void Updater::addElement(uint address, IUpdateElement *element)
 
 void Updater::update()
 {
-    if (_testVal >= 0) { // TODO: remove this
-        _testVal = -100;
-    } else {
-        _testVal = _testVal + 1;
-    }
     foreach(auto pair, _elementVector) {
-
-        // TODO: read register with address = _registerAccess.read(pair.second, ...);
-        pair.first->updateParam(_testVal);
+        QVector<quint32> readVector;
+        _registerAccess.read(pair.second, readVector, 1);
+        pair.first->updateParam(readVector[0]);
     }
 }

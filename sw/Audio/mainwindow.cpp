@@ -28,7 +28,8 @@ MainWindow::MainWindow(QWidget *parent) :
     _addressField(),
     _dataField(),
     _debugButton("Debug"),
-    _meter(new Meter()),
+    _meterL(new Meter()),
+    _meterR(new Meter()),
     _settingsGroup(new QGroupBox("Settings")),
     _registerGroup(new QGroupBox("Register read/write")),
     _debugGroup(new QGroupBox("Debug")),
@@ -119,10 +120,12 @@ void MainWindow::setupRegister(QGroupBox *group)
 void MainWindow::setupDebug(QGroupBox *group)
 {
     _debugLayout->addWidget(&_debugButton, 0, 0);
-    _debugLayout->addWidget(_meter, 1, 0);
+    _debugLayout->addWidget(_meterL, 1, 0);
+    _debugLayout->addWidget(_meterR, 1, 1);
     group->setLayout(_debugLayout);
 
-    _updater.addElement(0x0, _meter);
+    _updater.addElement(0x4, _meterL);
+    _updater.addElement(0x8, _meterR);
 
     connect(&_debugButton, SIGNAL (released()), this, SLOT (onDebugButtonPressed()));
 }

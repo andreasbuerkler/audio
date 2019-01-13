@@ -9,7 +9,7 @@ class IUpdateElement : public QWidget
 
 public:
     virtual ~IUpdateElement() { }
-    virtual void updateParam(int param) = 0;
+    virtual void updateParam(unsigned int param) = 0;
 };
 
 #endif // IUPDATEELEMENT_H

@@ -9,7 +9,7 @@ class Meter : public IUpdateElement
     Q_OBJECT
 public:
     explicit Meter();
-    void updateParam(int level) override;
+    void updateParam(unsigned int level) override;
 
 protected:
     void paintEvent(QPaintEvent *event) override;
@@ -24,6 +24,7 @@ private:
     int    _width;
     int    _height;
     int    _level;
+    float  _levelDisplay;
 };
 
 #endif // METER_H

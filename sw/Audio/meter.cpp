@@ -13,21 +13,22 @@ Meter::Meter() :
     _font(),
     _width(250),
     _height(90),
-    _level(-100)
+    _level(-100),
+    _levelDisplay(-100.0)
 {
     _font.setPixelSize(9);
     setFixedSize(QSize(_width, _height));
 }
 
-void Meter::updateParam(int level)
+void Meter::updateParam(unsigned int level)
 {
-    if (level > 0) {
-        level = 0;
+    _levelDisplay = -(static_cast<float>(level)/2);
+
+    if (level > 200) {
+        _level = -100;
+    } else {
+        _level = -static_cast<int>(level)/2;
     }
-    if (level < -100) {
-        level = -100;
-    }
-    _level = level;
     update();
 }
 
@@ -56,7 +57,7 @@ void Meter::paintEvent(QPaintEvent *)
     painter.setBrush(_textBackgroundColor);
     painter.drawRoundedRect(textRect, 5, 5);
     painter.setPen(_frameColor);
-    painter.drawText(textRect, Qt::AlignCenter, QString::number(_level) + QString(" dB"));
+    painter.drawText(textRect, Qt::AlignCenter, QString::number(static_cast<double>(_levelDisplay), 'f', 1) + QString(" dB"));
 
     // draw arc
     painter.translate(_width/2, circleRadius);

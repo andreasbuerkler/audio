@@ -64,7 +64,8 @@ private:
     QLineEdit      _dataField;
 
     QPushButton    _debugButton;
-    IUpdateElement *_meter;
+    IUpdateElement *_meterL;
+    IUpdateElement *_meterR;
 
     QGroupBox      *_settingsGroup;
     QGroupBox      *_registerGroup;

@@ -3,6 +3,7 @@
 -- Date      : 28.12.2018
 -- Filename  : registerbank.vhd
 -- Changelog : 28.12.2018 - file created
+--             13.01.2019 - read strobe added
 --------------------------------------------------------------------------------
 
 library ieee;
@@ -28,6 +29,7 @@ port (
     data_strb_i    : in  std_logic_vector(register_count_g-1 downto 0);
     data_o         : out std_logic_array_32(register_count_g-1 downto 0);
     data_strb_o    : out std_logic_vector(register_count_g-1 downto 0);
+    read_strb_o    : out std_logic_vector(register_count_g-1 downto 0);
     -- ctrl bus
     ctrl_address_i : in  std_logic_vector(address_width_g-1 downto 0);
     ctrl_data_i    : in  std_logic_vector(data_width_g-1 downto 0);
@@ -41,6 +43,7 @@ architecture rtl of registerbank is
 
     signal register_r  : std_logic_array_32(register_count_g-1 downto 0) := register_init_g;
     signal data_strb_r : std_logic_vector(register_count_g-1 downto 0) := (others => '0');
+    signal read_strb_r : std_logic_vector(register_count_g-1 downto 0) := (others => '0');
     signal ctrl_data_r : std_logic_vector(data_width_g-1 downto 0) := (others => '0');
     signal ctrl_ack_r  : std_logic := '0';
 
@@ -73,9 +76,11 @@ begin
     begin
         if (rising_edge(clk_i)) then
             ctrl_ack_r <= '0';
+            read_strb_r <= (others => '0');
             for i in 0 to register_count_g-1 loop
                 if ((ctrl_strobe_i = '1') and (ctrl_write_i = '0')) then
                     if (unsigned(ctrl_address_i) = to_unsigned(i, ctrl_address_i'length)) then
+                        read_strb_r(i) <= '1';
                         for j in 0 to data_width_g-1 loop
                             ctrl_data_r(j) <= register_r(i)(j) and register_mask_g(i)(j);
                         end loop;
@@ -88,6 +93,7 @@ begin
 
     data_o <= register_r;
     data_strb_o <= data_strb_r;
+    read_strb_o <= read_strb_r;
 
     ctrl_data_o <= ctrl_data_r;
     ctrl_ack_o <= ctrl_ack_r;
