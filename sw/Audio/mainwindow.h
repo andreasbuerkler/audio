@@ -17,6 +17,7 @@
 
 #include "udptransfer.h"
 #include "registeraccess.h"
+#include "registermock.h"
 #include "typedefinitions.h"
 #include "meter.h"
 #include "updater.h"
@@ -46,6 +47,7 @@ private:
 
     UdpTransfer    _udptransfer;
     RegisterAccess _registerAccess;
+    RegisterMock   _registerMock;
     Updater        _updater;
     QPalette       _paletteActive;
     QPalette       _paletteInactive;
@@ -64,8 +66,8 @@ private:
     QLineEdit      _dataField;
 
     QPushButton    _debugButton;
-    IUpdateElement *_meterL;
-    IUpdateElement *_meterR;
+    Meter          _meterL;
+    Meter          _meterR;
 
     QGroupBox      *_settingsGroup;
     QGroupBox      *_registerGroup;

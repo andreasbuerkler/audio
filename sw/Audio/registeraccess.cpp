@@ -8,13 +8,14 @@
 #include "registeraccess.h"
 #include "typedefinitions.h"
 
-RegisterAccess::RegisterAccess(UdpTransfer &udpTransfer, QObject *parent) :
-    QObject(parent),
+RegisterAccess::RegisterAccess(UdpTransfer &udpTransfer) :
     _udpTransfer(udpTransfer),
     _id(0)
 {
 
 }
+
+RegisterAccess::~RegisterAccess() {}
 
 int RegisterAccess::read(quint32 address, QVector<quint32> &data, int length)
 {

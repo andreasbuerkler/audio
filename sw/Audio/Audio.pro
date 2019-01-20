@@ -32,7 +32,9 @@ SOURCES += \
     udptransfer.cpp \
     registeraccess.cpp \
     meter.cpp \
-    updater.cpp
+    updater.cpp \
+    iregisteraccess.cpp \
+    registermock.cpp
 
 HEADERS += \
     mainwindow.h \
@@ -41,7 +43,9 @@ HEADERS += \
     typedefinitions.h \
     meter.h \
     updater.h \
-    iupdateelement.h
+    iupdateelement.h \
+    iregisteraccess.h \
+    registermock.h
 
 FORMS += \
     mainwindow.ui

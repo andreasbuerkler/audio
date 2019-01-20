@@ -1,3 +1,10 @@
+//------------------------------------------------------------------------------
+// Author    : Andreas Buerkler
+// Date      : 20.01.2019
+// Filename  : meter.h
+// Changelog : 20.01.2019 - file created
+//------------------------------------------------------------------------------
+
 #ifndef METER_H
 #define METER_H
 
@@ -9,6 +16,7 @@ class Meter : public IUpdateElement
     Q_OBJECT
 public:
     explicit Meter();
+    ~Meter() override;
     void updateParam(unsigned int level) override;
 
 protected:

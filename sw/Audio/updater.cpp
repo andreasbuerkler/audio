@@ -1,6 +1,13 @@
+//------------------------------------------------------------------------------
+// Author    : Andreas Buerkler
+// Date      : 20.01.2019
+// Filename  : updater.cpp
+// Changelog : 20.01.2019 - file created
+//------------------------------------------------------------------------------
+
 #include "updater.h"
 
-Updater::Updater(RegisterAccess &registerAccess, QObject *parent) :
+Updater::Updater(IRegisterAccess *registerAccess, QObject *parent) :
     QObject(parent),
     _timer(this),
     _registerAccess(registerAccess)
@@ -18,7 +25,7 @@ void Updater::update()
 {
     foreach(auto pair, _elementVector) {
         QVector<quint32> readVector;
-        _registerAccess.read(pair.second, readVector, 1);
+        _registerAccess->read(pair.second, readVector, 1);
         pair.first->updateParam(readVector[0]);
     }
 }

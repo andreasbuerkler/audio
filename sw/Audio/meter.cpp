@@ -1,3 +1,10 @@
+//------------------------------------------------------------------------------
+// Author    : Andreas Buerkler
+// Date      : 20.01.2019
+// Filename  : meter.cpp
+// Changelog : 20.01.2019 - file created
+//------------------------------------------------------------------------------
+
 #include "meter.h"
 
 #include <QPainter>
@@ -19,6 +26,8 @@ Meter::Meter() :
     _font.setPixelSize(9);
     setFixedSize(QSize(_width, _height));
 }
+
+Meter::~Meter() {}
 
 void Meter::updateParam(unsigned int level)
 {

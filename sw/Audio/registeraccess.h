@@ -11,18 +11,16 @@
 #include <QObject>
 #include <QMutex>
 #include "udptransfer.h"
+#include "iregisteraccess.h"
 
-class RegisterAccess : public QObject
+class RegisterAccess : public IRegisterAccess
 {
-    Q_OBJECT
+
 public:
-    explicit RegisterAccess(UdpTransfer &udpTransfer, QObject *parent = nullptr);
-    int read(quint32 address, QVector<quint32> &data, int length);
-    int write(quint32 address, QVector<quint32> &data);
-
-signals:
-
-public slots:
+    explicit RegisterAccess(UdpTransfer &udpTransfer);
+    ~RegisterAccess() override;
+    int read(quint32 address, QVector<quint32> &data, int length) override;
+    int write(quint32 address, QVector<quint32> &data) override;
 
 private:
     quint8 sendReadCommand(quint32 address, int length);
