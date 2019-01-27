@@ -32,6 +32,8 @@ MainWindow::MainWindow(QWidget *parent) :
     _debugButton("Debug"),
     _meterL(),
     _meterR(),
+    _levelL(),
+    _levelR(),
     _settingsGroup(new QGroupBox("Settings")),
     _registerGroup(new QGroupBox("Register read/write")),
     _debugGroup(new QGroupBox("Debug")),
@@ -124,6 +126,8 @@ void MainWindow::setupDebug(QGroupBox *group)
     _debugLayout->addWidget(&_debugButton, 0, 0);
     _debugLayout->addWidget(&_meterL, 1, 0);
     _debugLayout->addWidget(&_meterR, 1, 1);
+    _debugLayout->addWidget(&_levelL, 2, 0);
+    _debugLayout->addWidget(&_levelR, 2, 1);
     group->setLayout(_debugLayout);
 
     _updater.addElement(0x4, &_meterL);

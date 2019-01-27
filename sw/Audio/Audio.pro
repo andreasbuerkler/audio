@@ -34,7 +34,8 @@ SOURCES += \
     meter.cpp \
     updater.cpp \
     iregisteraccess.cpp \
-    registermock.cpp
+    registermock.cpp \
+    levelslider.cpp
 
 HEADERS += \
     mainwindow.h \
@@ -45,7 +46,8 @@ HEADERS += \
     updater.h \
     iupdateelement.h \
     iregisteraccess.h \
-    registermock.h
+    registermock.h \
+    levelslider.h
 
 FORMS += \
     mainwindow.ui

@@ -23,16 +23,17 @@ protected:
     void paintEvent(QPaintEvent *event) override;
 
 private:
-    QColor _frameColor;
-    QColor _backgroundColor;
-    QColor _textBackgroundColor;
-    QColor _textFrameColor;
-    QColor _barColor;
-    QFont  _font;
-    int    _width;
-    int    _height;
-    int    _level;
-    float  _levelDisplay;
+    QColor       _frameColor;
+    QColor       _backgroundColor;
+    QColor       _textBackgroundColor;
+    QColor       _textFrameColor;
+    QColor       _barColor;
+    QFont        _font;
+    int          _width;
+    int          _height;
+    unsigned int _level;
+    int          _levelBar;
+    float        _levelDisplay;
 };
 
 #endif // METER_H

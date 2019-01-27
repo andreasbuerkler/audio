@@ -20,8 +20,9 @@ Meter::Meter() :
     _font(),
     _width(250),
     _height(90),
-    _level(-100),
-    _levelDisplay(-100.0)
+    _level(200),
+    _levelBar(-100),
+    _levelDisplay(-100.0f)
 {
     _font.setPixelSize(9);
     setFixedSize(QSize(_width, _height));
@@ -31,12 +32,22 @@ Meter::~Meter() {}
 
 void Meter::updateParam(unsigned int level)
 {
-    _levelDisplay = -(static_cast<float>(level)/2);
+    if (_level < level) {
+        if (_level < (level - 2)) {
+            _level = _level + 2;
+        } else {
+            _level = level;
+        }
+    } else if (_level > level) {
+        _level = level;
+    }
 
-    if (level > 200) {
-        _level = -100;
+    _levelDisplay = (_levelDisplay*0.8f) + (-static_cast<float>(_level)/2*0.2f);
+
+    if (_level > 200) {
+        _levelBar = -100;
     } else {
-        _level = -static_cast<int>(level)/2;
+        _levelBar = -static_cast<int>(_level)/2;
     }
     update();
 }
@@ -105,7 +116,7 @@ void Meter::paintEvent(QPaintEvent *)
     // draw needle
     painter.setPen(QPen(_barColor, 3));
     painter.setOpacity(0.5);
-    qreal angle = (span/2 + span/100*_level) * M_PI_2;
+    qreal angle = (span/2 + span/100*_levelBar) * M_PI_2;
     painter.drawLine(static_cast<int>((outerRadius+markLength*2)*qSin(angle)),
                      static_cast<int>((-outerRadius-markLength*2)*qCos(angle)),
                      static_cast<int>((innerRadius-markLength*2)*qSin(angle)),
