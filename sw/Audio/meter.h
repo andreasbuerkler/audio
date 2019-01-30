@@ -25,8 +25,6 @@ protected:
 private:
     QColor       _frameColor;
     QColor       _backgroundColor;
-    QColor       _textBackgroundColor;
-    QColor       _textFrameColor;
     QColor       _barColor;
     QFont        _font;
     int          _width;

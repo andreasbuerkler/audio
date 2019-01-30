@@ -12,10 +12,8 @@
 #include <QtMath>
 
 Meter::Meter() :
-    _frameColor(0, 0, 0),
-    _backgroundColor(250, 250, 210),
-    _textBackgroundColor(255, 255, 255),
-    _textFrameColor(100, 100, 100),
+    _frameColor(230, 230, 230),
+    _backgroundColor(0, 90, 200),
     _barColor(200, 50, 50),
     _font(),
     _width(250),
@@ -66,20 +64,21 @@ void Meter::paintEvent(QPaintEvent *)
     painter.setFont(_font);
 
     // draw frame
-    painter.setPen(_frameColor);
+    painter.setPen(_backgroundColor);
     painter.setBrush(_backgroundColor);
     QRect frame(0, 0, _width, _height);
     painter.drawRoundedRect(frame, 5, 5);
 
     // draw dB text field
     QRect textRect(_width/2-30, static_cast<int>(_height*0.78-9), 60, 18);
-    painter.setPen(_textFrameColor);
-    painter.setBrush(_textBackgroundColor);
-    painter.drawRoundedRect(textRect, 5, 5);
     painter.setPen(_frameColor);
+    painter.setBrush(_frameColor);
+    painter.drawRoundedRect(textRect, 5, 5);
+    painter.setPen(_backgroundColor);
     painter.drawText(textRect, Qt::AlignCenter, QString::number(static_cast<double>(_levelDisplay), 'f', 1) + QString(" dB"));
 
     // draw arc
+    painter.setPen(_frameColor);
     painter.translate(_width/2, circleRadius);
     QRect outerArcRect(-outerRadius, -outerRadius, 2*outerRadius, 2*outerRadius);
     QRect innerArcRect(-innerRadius, -innerRadius, 2*innerRadius, 2*innerRadius);
@@ -114,9 +113,16 @@ void Meter::paintEvent(QPaintEvent *)
     }
 
     // draw needle
-    painter.setPen(QPen(_barColor, 3));
-    painter.setOpacity(0.5);
     qreal angle = (span/2 + span/100*_levelBar) * M_PI_2;
+    painter.setPen(QPen(_frameColor, 5));
+    painter.setOpacity(0.3);
+    painter.drawLine(static_cast<int>((outerRadius+markLength*2)*qSin(angle)),
+                     static_cast<int>((-outerRadius-markLength*2)*qCos(angle)),
+                     static_cast<int>((innerRadius-markLength*2)*qSin(angle)),
+                     static_cast<int>((-innerRadius+markLength*2)*qCos(angle)));
+
+    painter.setPen(QPen(_barColor, 1));
+    painter.setOpacity(1.0);
     painter.drawLine(static_cast<int>((outerRadius+markLength*2)*qSin(angle)),
                      static_cast<int>((-outerRadius-markLength*2)*qCos(angle)),
                      static_cast<int>((innerRadius-markLength*2)*qSin(angle)),

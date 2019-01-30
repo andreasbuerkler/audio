@@ -50,8 +50,6 @@ private:
     RegisterAccess _registerAccess;
     RegisterMock   _registerMock;
     Updater        _updater;
-    QPalette       _paletteActive;
-    QPalette       _paletteInactive;
 
     QLabel         _ipAddressLabel;
     QLabel         _portLabel;

@@ -16,8 +16,6 @@ MainWindow::MainWindow(QWidget *parent) :
     _registerMock(),
     _updater(&_registerMock, this),
     //_updater(&_registerAccess, this),
-    _paletteActive(),
-    _paletteInactive(),
     _ipAddressLabel("IP Address:"),
     _portLabel("UDP Port:"),
     _ipAddressField(),
@@ -46,8 +44,6 @@ MainWindow::MainWindow(QWidget *parent) :
 {
     _ui->setupUi(this);
     delete _ui->mainToolBar;
-    _paletteActive.setColor(QPalette::Text, Qt::black);
-    _paletteInactive.setColor(QPalette::Text, Qt::darkGray);
 
     statusBar()->setSizeGripEnabled(false);
 
@@ -83,12 +79,10 @@ void MainWindow::setupSettings(QGroupBox *group)
     _portField.setText(QString::number(_udptransfer.getPort()));
     _portField.setReadOnly(true);
     _portField.setFrame(false);
-    _portField.setPalette(_paletteInactive);
     _ipAddressField.setInputMask("900.900.900.900");
     _ipAddressField.setText(_udptransfer.getAddress());
     _ipAddressField.setReadOnly(true);
     _ipAddressField.setFrame(false);
-    _ipAddressField.setPalette(_paletteInactive);
 
     _settingsLayout->addWidget(&_ipAddressLabel, 0, 0);
     _settingsLayout->addWidget(&_portLabel, 1, 0);
@@ -147,12 +141,8 @@ void MainWindow::onChangeSettingsButtonPressed()
 
     if (!_portField.isReadOnly()) {
         _changeSettingsButton.setText("Save");
-        _portField.setPalette(_paletteActive);
-        _ipAddressField.setPalette(_paletteActive);
     } else {
         _changeSettingsButton.setText("Change");
-        _portField.setPalette(_paletteInactive);
-        _ipAddressField.setPalette(_paletteInactive);
 
         settingsChanged |= _udptransfer.setAddress(_ipAddressField.text());
         settingsChanged |= _udptransfer.setPort(static_cast<quint16>(_portField.text().toInt()));

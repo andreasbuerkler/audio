@@ -1,0 +1,72 @@
+QWidget {
+    background-color: rgb(230, 230, 230);
+}
+
+QPushButton {
+    background-color: rgb(0, 40, 80);
+    color: rgb(230, 230, 230);
+    border-width: 0px;
+    border-radius: 5px;
+    font: bold 12px "Tahoma";
+    min-width: 10em;
+    padding: 4px;
+}
+
+QPushButton:hover {
+    background-color: rgb(20, 60, 100);
+}
+
+QPushButton:pressed {
+    background-color: rgb(230, 230, 230);
+    color: rgb(0, 90, 200);
+}
+
+QLineEdit {
+    background-color: rgb(230, 230, 230);
+    color: rgb(0, 90, 200);
+    border-width: 0px;
+    border-radius: 5px;
+    font: bold 12px "Tahoma";
+    padding: 4px;
+}
+
+QLineEdit:focus {
+    background-color: rgb(180, 180, 180);
+}
+
+QLineEdit:hover {
+    background-color: rgb(180, 180, 180);
+}
+
+QLineEdit:read-only {
+    background-color: rgb(0, 90, 200);
+    color: rgb(230, 230, 230);
+}
+
+QLabel {
+    background-color: rgb(0, 80, 170);
+    color: rgb(230, 230, 230);
+    font: bold 12px "Tahoma";
+    padding: 4px;
+}
+
+QGroupBox {
+    subcontrol-origin: margin;
+    subcontrol-position: top center;
+    background-color: rgb(0, 80, 170);
+    color: rgb(230, 230, 230);
+    font: bold 12px "Tahoma";
+    border-width: 0px;
+    border-radius: 5px;
+}
+
+QGroupBox::title {
+    color: rgb(0, 80, 170);
+    height: 0px;
+}
+
+QStatusBar {
+    background-color: rgb(230, 230, 230);
+    color: rgb(0, 90, 200);
+    font: bold 12px "Tahoma";
+}
