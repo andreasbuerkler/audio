@@ -1,7 +1,7 @@
 //------------------------------------------------------------------------------
 // Author    : Andreas Buerkler
 // Date      : 27.01.2019
-// Filename  : levelslider.h
+// Filename  : fader.h
 // Changelog : 27.01.2019 - file created
 //------------------------------------------------------------------------------
 
@@ -11,12 +11,12 @@
 #include <QWidget>
 #include <QMouseEvent>
 
-class LevelSlider : public QWidget
+class Fader : public QWidget
 {
     Q_OBJECT
 
 public:
-    LevelSlider();
+    Fader();
     void mouseMoveEvent(QMouseEvent *event) override;
     void mousePressEvent(QMouseEvent *event) override;
     void mouseReleaseEvent(QMouseEvent *event) override;

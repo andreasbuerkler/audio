@@ -1,14 +1,14 @@
 //------------------------------------------------------------------------------
 // Author    : Andreas Buerkler
 // Date      : 27.01.2019
-// Filename  : levelslider.cpp
+// Filename  : fader.cpp
 // Changelog : 27.01.2019 - file created
 //------------------------------------------------------------------------------
 
-#include "levelslider.h"
+#include "fader.h"
 #include <QPainter>
 
-LevelSlider::LevelSlider() :
+Fader::Fader() :
     _frameColor(230, 230, 230),
     _backgroundColor(0, 100, 220),
     _sliderColor(0, 40, 80),
@@ -35,7 +35,7 @@ LevelSlider::LevelSlider() :
     setMouseTracking(true);
 }
 
-void LevelSlider::paintEvent(QPaintEvent *)
+void Fader::paintEvent(QPaintEvent *)
 {
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
@@ -88,12 +88,12 @@ void LevelSlider::paintEvent(QPaintEvent *)
     //painter.drawText(dBRect, Qt::AlignCenter, QString::number(static_cast<double>(level), 'f', 1) + QString(" dB"));
 }
 
-void LevelSlider::updateGain(float level)
+void Fader::updateGain(float level)
 {
 
 }
 
-void LevelSlider::mouseMoveEvent(QMouseEvent *event)
+void Fader::mouseMoveEvent(QMouseEvent *event)
 {
     bool updateRequired = false;
     // check if mouse is in slider area
@@ -140,7 +140,7 @@ void LevelSlider::mouseMoveEvent(QMouseEvent *event)
     }
 }
 
-void LevelSlider::mousePressEvent(QMouseEvent *event)
+void Fader::mousePressEvent(QMouseEvent *event)
 {
     if (event->button() == Qt::LeftButton) {
         _oldMousePosX = event->pos().x();
@@ -148,7 +148,7 @@ void LevelSlider::mousePressEvent(QMouseEvent *event)
     }
 }
 
-void LevelSlider::mouseReleaseEvent(QMouseEvent *event)
+void Fader::mouseReleaseEvent(QMouseEvent *event)
 {
     if (event->button() == Qt::LeftButton && _moveEnable) {
         _moveEnable = false;

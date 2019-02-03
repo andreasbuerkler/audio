@@ -21,7 +21,7 @@
 #include "typedefinitions.h"
 #include "meter.h"
 #include "updater.h"
-#include "levelslider.h"
+#include "fader.h"
 
 namespace Ui {
     class MainWindow;
@@ -68,8 +68,8 @@ private:
     QPushButton    _debugButton;
     Meter          _meterL;
     Meter          _meterR;
-    LevelSlider    _levelL;
-    LevelSlider    _levelR;
+    Fader          _levelL;
+    Fader          _levelR;
     QGroupBox      *_settingsGroup;
     QGroupBox      *_registerGroup;
     QGroupBox      *_inputGroup;

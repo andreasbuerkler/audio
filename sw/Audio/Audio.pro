@@ -35,7 +35,7 @@ SOURCES += \
     updater.cpp \
     iregisteraccess.cpp \
     registermock.cpp \
-    levelslider.cpp
+    fader.cpp
 
 HEADERS += \
     mainwindow.h \
@@ -47,7 +47,7 @@ HEADERS += \
     iupdateelement.h \
     iregisteraccess.h \
     registermock.h \
-    levelslider.h
+    fader.h
 
 FORMS += \
     mainwindow.ui
