@@ -28,16 +28,18 @@ MainWindow::MainWindow(QWidget *parent) :
     _addressField(),
     _dataField(),
     _debugButton("Debug"),
-    _meterL(),
-    _meterR(),
+    _meterL("Input L"),
+    _meterR("Input R"),
     _levelL(),
     _levelR(),
-    _settingsGroup(new QGroupBox("Settings")),
-    _registerGroup(new QGroupBox("Register read/write")),
-    _debugGroup(new QGroupBox("Debug")),
+    _settingsGroup(new QGroupBox()),
+    _registerGroup(new QGroupBox()),
+    _inputGroup(new QGroupBox()),
+    _debugGroup(new QGroupBox()),
     _centralWidget(new QWidget(this)),
     _settingsLayout(new QGridLayout()),
     _registerLayout(new QGridLayout()),
+    _inputLayout(new QGridLayout()),
     _debugLayout(new QGridLayout()),
     _mainLayout(new QGridLayout(_centralWidget)),
     _ui(new Ui::MainWindow)
@@ -50,11 +52,13 @@ MainWindow::MainWindow(QWidget *parent) :
     // create layout
     setupSettings(_settingsGroup);
     setupRegister(_registerGroup);
+    setupInput(_inputGroup);
     setupDebug(_debugGroup);
 
     _mainLayout->addWidget(_settingsGroup, 0, 0);
     _mainLayout->addWidget(_registerGroup, 1, 0);
-    _mainLayout->addWidget(_debugGroup, 2, 0);
+    _mainLayout->addWidget(_inputGroup, 2, 0);
+    _mainLayout->addWidget(_debugGroup, 3, 0);
 
     setCentralWidget(_centralWidget);
     setWindowTitle("Audio Control");
@@ -115,17 +119,22 @@ void MainWindow::setupRegister(QGroupBox *group)
     connect(&_writeButton, SIGNAL (released()), this, SLOT (onWriteButtonPressed()));
 }
 
-void MainWindow::setupDebug(QGroupBox *group)
+void MainWindow::setupInput(QGroupBox *group)
 {
-    _debugLayout->addWidget(&_debugButton, 0, 0);
-    _debugLayout->addWidget(&_meterL, 1, 0);
-    _debugLayout->addWidget(&_meterR, 1, 1);
-    _debugLayout->addWidget(&_levelL, 2, 0);
-    _debugLayout->addWidget(&_levelR, 2, 1);
-    group->setLayout(_debugLayout);
+    _inputLayout->addWidget(&_meterL, 0, 0);
+    _inputLayout->addWidget(&_meterR, 0, 1);
+    _inputLayout->addWidget(&_levelL, 1, 0);
+    _inputLayout->addWidget(&_levelR, 1, 1);
+    group->setLayout(_inputLayout);
 
     _updater.addElement(0x4, &_meterL);
     _updater.addElement(0x8, &_meterR);
+}
+
+void MainWindow::setupDebug(QGroupBox *group)
+{
+    _debugLayout->addWidget(&_debugButton, 0, 0);
+    group->setLayout(_debugLayout);
 
     connect(&_debugButton, SIGNAL (released()), this, SLOT (onDebugButtonPressed()));
 }

@@ -13,7 +13,7 @@ QPushButton {
 }
 
 QPushButton:hover {
-    background-color: rgb(20, 60, 100);
+    background-color: rgb(0, 0, 0);
 }
 
 QPushButton:pressed {
@@ -39,7 +39,7 @@ QLineEdit:hover {
 }
 
 QLineEdit:read-only {
-    background-color: rgb(0, 90, 200);
+    background-color: rgb(0, 80, 170);
     color: rgb(230, 230, 230);
 }
 

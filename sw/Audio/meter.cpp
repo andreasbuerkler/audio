@@ -11,18 +11,23 @@
 #include <QFont>
 #include <QtMath>
 
-Meter::Meter() :
+Meter::Meter(QString label) :
     _frameColor(230, 230, 230),
-    _backgroundColor(0, 90, 200),
+    _backgroundColor(0, 100, 220),
     _barColor(200, 50, 50),
-    _font(),
+    _labelFont(),
+    _markerFont(),
+    _label(label),
     _width(250),
     _height(90),
     _level(200),
     _levelBar(-100),
     _levelDisplay(-100.0f)
 {
-    _font.setPixelSize(9);
+    _labelFont.setPixelSize(12);
+    _labelFont.setBold(true);
+    _labelFont.setFamily("Tahoma");
+    _markerFont.setPixelSize(9);
     setFixedSize(QSize(_width, _height));
 }
 
@@ -61,7 +66,6 @@ void Meter::paintEvent(QPaintEvent *)
 
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
-    painter.setFont(_font);
 
     // draw frame
     painter.setPen(_backgroundColor);
@@ -69,13 +73,18 @@ void Meter::paintEvent(QPaintEvent *)
     QRect frame(0, 0, _width, _height);
     painter.drawRoundedRect(frame, 5, 5);
 
-    // draw dB text field
     QRect textRect(_width/2-30, static_cast<int>(_height*0.78-9), 60, 18);
     painter.setPen(_frameColor);
-    painter.setBrush(_frameColor);
-    painter.drawRoundedRect(textRect, 5, 5);
-    painter.setPen(_backgroundColor);
-    painter.drawText(textRect, Qt::AlignCenter, QString::number(static_cast<double>(_levelDisplay), 'f', 1) + QString(" dB"));
+    painter.setFont(_labelFont);
+    painter.drawText(textRect, Qt::AlignCenter, _label);
+
+    // draw dB text field
+    //QRect textRect(_width/2-30, static_cast<int>(_height*0.78-9), 60, 18);
+    //painter.setPen(_frameColor);
+    //painter.setBrush(_frameColor);
+    //painter.drawRoundedRect(textRect, 5, 5);
+    //painter.setPen(_backgroundColor);
+    //painter.drawText(textRect, Qt::AlignCenter, QString::number(static_cast<double>(_levelDisplay), 'f', 1) + QString(" dB"));
 
     // draw arc
     painter.setPen(_frameColor);
@@ -86,6 +95,7 @@ void Meter::paintEvent(QPaintEvent *)
     painter.drawArc(innerArcRect, static_cast<int>(16*(90-(span/2*90))), static_cast<int>(16*(span*90)));
 
     // draw 10 dB arc marker lines
+    painter.setFont(_markerFont);
     int textdB = -100;
     for (qreal i=-span/2; i<=(span/2)+(span/20); i+=span/10) {
         painter.drawLine(static_cast<int>((outerRadius-markLength)*qSin(i*M_PI_2)),

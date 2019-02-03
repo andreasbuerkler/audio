@@ -10,8 +10,10 @@
 
 LevelSlider::LevelSlider() :
     _frameColor(230, 230, 230),
-    _backgroundColor(0, 90, 200),
-    _barColor(0, 40, 100),
+    _backgroundColor(0, 100, 220),
+    _sliderColor(0, 40, 80),
+    _sliderActiveColor(0, 0, 0),
+    _sliderInactiveColor(0, 40, 80),
     _font(),
     _width(250),
     _height(50),
@@ -19,7 +21,14 @@ LevelSlider::LevelSlider() :
     _moveValueX(0),
     _sliderPos(10),
     _sliderWidth(40),
-    _moveEnable(false)
+    _sliderHeight(16),
+    _lineOffset(10),
+    _lineHeight(6),
+    _moveEnable(false),
+    _sliderActive(false),
+    _rangedB(80),
+    _sliderSpacing(10),
+    _numberOfMarkers(8)
 {
    _font.setPixelSize(9);
     setFixedSize(QSize(_width, _height));
@@ -41,57 +50,93 @@ void LevelSlider::paintEvent(QPaintEvent *)
     // draw dB text and marker lines
     painter.setPen(_frameColor);
     painter.setBrush(_backgroundColor);
-    int border = 10+_sliderWidth/2;
-    int lineWidth = _width-2*border;
-    int numberOfMarkers = 8;
-    int textdB = -80;
-    for (int i=0; i<=numberOfMarkers; i++) {
-        float offset = border+lineWidth/static_cast<float>(numberOfMarkers)*i;
+    const int border = _sliderSpacing+_sliderWidth/2;
+    const int lineWidth = _width-2*border;
+    int textdB = -_rangedB;
+    for (int i=0; i<=_numberOfMarkers; i++) {
+        float offset = border+lineWidth/static_cast<float>(_numberOfMarkers)*i;
         painter.drawLine(static_cast<int>(offset), 20, static_cast<int>(offset), _height-5);
         QRect textRect(static_cast<int>(offset)-10, 0, 20, 20);
         painter.drawText(textRect, Qt::AlignCenter, QString::number(textdB));
-        textdB += 10;
+        textdB += _rangedB/_numberOfMarkers;
     }
 
     // draw line
-    int offset = 10;
-    int lineHeight = 6;
     painter.setPen(QPen(_backgroundColor, 1));
     painter.setBrush(_frameColor);
-    QRect line(border-5, _height/2-lineHeight/2+offset, lineWidth+10, lineHeight);
+    QRect line(border-5, _height/2-_lineHeight/2+_lineOffset, lineWidth+10, _lineHeight);
     painter.drawRoundedRect(line, 5, 5);
 
     // draw slider
-    int sliderHeight = 20;
-    painter.setPen(_backgroundColor);
-    painter.setBrush(_frameColor);
-    painter.setOpacity(1.0);
-    QRect slider(_sliderPos, _height/2+offset-sliderHeight/2, _sliderWidth, sliderHeight);
+    painter.setPen(_sliderColor);
+    painter.setBrush(_sliderColor);
+    const int sliderTop = _height/2+_lineOffset-_sliderHeight/2;
+    QRect slider(_sliderPos, sliderTop, _sliderWidth, _sliderHeight);
     painter.drawRoundedRect(slider, 5, 5);
-    painter.drawLine(_sliderPos+_sliderWidth/2, _height/2+offset-sliderHeight/2, _sliderPos+_sliderWidth/2, _height/2+offset-sliderHeight/2+4);
-    painter.drawLine(_sliderPos+_sliderWidth/2, _height/2+offset+sliderHeight/2, _sliderPos+_sliderWidth/2, _height/2+offset+sliderHeight/2-4);
+    painter.setPen(_backgroundColor);
+    painter.drawLine(_sliderPos+_sliderWidth/2, sliderTop, _sliderPos+_sliderWidth/2, sliderTop+4);
+    painter.drawLine(_sliderPos+_sliderWidth/2, sliderTop+_sliderHeight, _sliderPos+_sliderWidth/2, sliderTop+_sliderHeight-4);
+
+    // calculate gain
+    float sliderRange = static_cast<float>(_width-_sliderWidth-2*_sliderSpacing);
+    float level = -_rangedB+static_cast<float>(_rangedB*(_sliderPos-_sliderSpacing)) / sliderRange;
+    updateGain(level);
 
     // draw dB inside slider
-    QRect dBRect(_sliderPos+_sliderWidth/2-20, _height/2+offset-10, 40, 20);
-    float dBVal = -84.2f+80.0f*static_cast<float>(_sliderPos)/static_cast<float>(_width-_sliderWidth-20);
-    painter.drawText(dBRect, Qt::AlignCenter, QString::number(static_cast<double>(dBVal), 'f', 1) + QString(" dB"));
+    //painter.setPen(_frameColor);
+    //QRect dBRect(_sliderPos+_sliderWidth/2-20, _height/2+_lineOffset-10, 40, 20);
+    //painter.drawText(dBRect, Qt::AlignCenter, QString::number(static_cast<double>(level), 'f', 1) + QString(" dB"));
+}
+
+void LevelSlider::updateGain(float level)
+{
+
 }
 
 void LevelSlider::mouseMoveEvent(QMouseEvent *event)
 {
+    bool updateRequired = false;
+    // check if mouse is in slider area
+    const int sliderTop = _height/2+_lineOffset-_sliderHeight/2;
+    if (((event->pos().x() > _sliderPos) && (event->pos().x() < (_sliderPos+_sliderWidth))) &&
+        ((event->pos().y() > sliderTop) && (event->pos().y() < sliderTop+_sliderHeight)))  {
+        if (!_sliderActive) {
+            updateRequired = true;
+        }
+        _sliderActive = true;
+    } else {
+        if (_sliderActive) {
+            updateRequired = true;
+        }
+        _sliderActive = false;
+    }
+    // move slider
     if ((event->buttons() & Qt::LeftButton) && _moveEnable) {
         _moveValueX = event->pos().x() - _oldMousePosX;
         _oldMousePosX = event->pos().x();
         _sliderPos += _moveValueX;
-        if (_sliderPos < 10) {
-            _sliderPos = 10;
+        if (_sliderPos < _sliderSpacing) {
+            _sliderPos = _sliderSpacing;
         }
-        if (_sliderPos > _width-_sliderWidth-10) {
-            _sliderPos =_width-_sliderWidth-10;
+        if (_sliderPos > _width-_sliderWidth-_sliderSpacing) {
+            _sliderPos =_width-_sliderWidth-_sliderSpacing;
         }
-        update();
+        updateRequired = true;
     } else {
         _moveValueX = 0;
+    }
+    // change color
+    if ((_moveEnable) || (_sliderActive)) {
+        _sliderColor = _sliderActiveColor;
+    } else {
+        if (_sliderColor == _sliderActiveColor) {
+            updateRequired = true;
+        }
+        _sliderColor = _sliderInactiveColor;
+    }
+    // update view
+    if (updateRequired) {
+        update();
     }
 }
 
@@ -99,7 +144,7 @@ void LevelSlider::mousePressEvent(QMouseEvent *event)
 {
     if (event->button() == Qt::LeftButton) {
         _oldMousePosX = event->pos().x();
-        _moveEnable = true;
+        _moveEnable = _sliderActive;
     }
 }
 

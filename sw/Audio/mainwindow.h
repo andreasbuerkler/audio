@@ -44,6 +44,7 @@ private slots:
 private:
     void setupSettings(QGroupBox *group);
     void setupRegister(QGroupBox *group);
+    void setupInput(QGroupBox *group);
     void setupDebug(QGroupBox *group);
 
     UdpTransfer    _udptransfer;
@@ -71,10 +72,12 @@ private:
     LevelSlider    _levelR;
     QGroupBox      *_settingsGroup;
     QGroupBox      *_registerGroup;
+    QGroupBox      *_inputGroup;
     QGroupBox      *_debugGroup;
     QWidget        *_centralWidget;
     QGridLayout    *_settingsLayout;
     QGridLayout    *_registerLayout;
+    QGridLayout    *_inputLayout;
     QGridLayout    *_debugLayout;
     QGridLayout    *_mainLayout;
 

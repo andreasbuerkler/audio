@@ -15,7 +15,7 @@ class Meter : public IUpdateElement
 {
     Q_OBJECT
 public:
-    explicit Meter();
+    explicit Meter(QString label);
     ~Meter() override;
     void updateParam(unsigned int level) override;
 
@@ -26,7 +26,9 @@ private:
     QColor       _frameColor;
     QColor       _backgroundColor;
     QColor       _barColor;
-    QFont        _font;
+    QFont        _labelFont;
+    QFont        _markerFont;
+    QString      _label;
     int          _width;
     int          _height;
     unsigned int _level;

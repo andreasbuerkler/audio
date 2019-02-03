@@ -25,9 +25,13 @@ protected:
     void paintEvent(QPaintEvent *event) override;
 
 private:
+    void updateGain(float level);
+
     QColor _frameColor;
     QColor _backgroundColor;
-    QColor _barColor;
+    QColor _sliderColor;
+    QColor _sliderActiveColor;
+    QColor _sliderInactiveColor;
     QFont  _font;
     int    _width;
     int    _height;
@@ -35,7 +39,14 @@ private:
     int    _moveValueX;
     int    _sliderPos;
     int    _sliderWidth;
+    int    _sliderHeight;
+    int    _lineOffset;
+    int    _lineHeight;
     bool   _moveEnable;
+    bool   _sliderActive;
+    int    _rangedB;
+    int    _sliderSpacing;
+    int    _numberOfMarkers;
 
 };
 
