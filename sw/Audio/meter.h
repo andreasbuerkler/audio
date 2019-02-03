@@ -17,7 +17,7 @@ class Meter : public IUpdateElement
 public:
     explicit Meter(QString label);
     ~Meter() override;
-    void updateParam(unsigned int level) override;
+    void updateParam(unsigned int *level) override;
 
 protected:
     void paintEvent(QPaintEvent *event) override;

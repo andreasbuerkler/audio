@@ -10,19 +10,21 @@
 
 #include <QWidget>
 #include <QMouseEvent>
+#include "iupdateelement.h"
 
-class Fader : public QWidget
+class Fader : public IUpdateElement
 {
     Q_OBJECT
 
 public:
     Fader();
-    void mouseMoveEvent(QMouseEvent *event) override;
-    void mousePressEvent(QMouseEvent *event) override;
-    void mouseReleaseEvent(QMouseEvent *event) override;
+    void updateParam(unsigned int *level) override;
 
 protected:
     void paintEvent(QPaintEvent *event) override;
+    void mouseMoveEvent(QMouseEvent *event) override;
+    void mousePressEvent(QMouseEvent *event) override;
+    void mouseReleaseEvent(QMouseEvent *event) override;
 
 private:
     void updateGain(float level);
@@ -47,6 +49,7 @@ private:
     int    _rangedB;
     int    _sliderSpacing;
     int    _numberOfMarkers;
+    float  _gainLevel;
 
 };
 

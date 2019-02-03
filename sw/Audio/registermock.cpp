@@ -9,10 +9,13 @@
 #include "registermock.h"
 #include "typedefinitions.h"
 
-RegisterMock::RegisterMock()
+RegisterMock::RegisterMock() :
+    _meterDataL(0),
+    _meterDataR(50),
+    _levelDataL(0),
+    _levelDataR(0)
 {
-    _meterDataL = 0;
-    _meterDataR = 50;
+
 }
 
 RegisterMock::~RegisterMock() {}
@@ -40,6 +43,16 @@ int RegisterMock::read(quint32 address, QVector<quint32> &data, int length)
             }
             }
             break;
+        case 0x0C :
+            for (int word=0; word<length; word++) {
+                data.append(_levelDataL);
+            }
+            break;
+        case 0x10 :
+            for (int word=0; word<length; word++) {
+                data.append(_levelDataR);
+            }
+            break;
         default:
             for (int word=0; word<length; word++) {
                 data.append(0x00);
@@ -55,6 +68,10 @@ int RegisterMock::write(quint32 address, QVector<quint32> &data)
         case 0x04 : _meterDataL = data[0];
             break;
         case 0x08 : _meterDataR = data[0];
+            break;
+        case 0x0C : _levelDataL = data[0];
+            break;
+        case 0x10 : _levelDataR = data[0];
             break;
     }
     return AUDIO_SUCCESS;

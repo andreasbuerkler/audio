@@ -22,6 +22,8 @@ public:
 private:
     quint32 _meterDataL;
     quint32 _meterDataR;
+    quint32 _levelDataL;
+    quint32 _levelDataR;
 
 };
 

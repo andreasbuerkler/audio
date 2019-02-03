@@ -33,16 +33,16 @@ Meter::Meter(QString label) :
 
 Meter::~Meter() {}
 
-void Meter::updateParam(unsigned int level)
+void Meter::updateParam(unsigned int *level)
 {
-    if (_level < level) {
-        if (_level < (level - 2)) {
+    if (_level < *level) {
+        if (_level < (*level - 2)) {
             _level = _level + 2;
         } else {
-            _level = level;
+            _level = *level;
         }
-    } else if (_level > level) {
-        _level = level;
+    } else if (_level > *level) {
+        _level = *level;
     }
 
     _levelDisplay = (_levelDisplay*0.8f) + (-static_cast<float>(_level)/2*0.2f);

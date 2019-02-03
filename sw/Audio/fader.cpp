@@ -28,7 +28,8 @@ Fader::Fader() :
     _sliderActive(false),
     _rangedB(80),
     _sliderSpacing(10),
-    _numberOfMarkers(8)
+    _numberOfMarkers(8),
+    _gainLevel(0)
 {
    _font.setPixelSize(9);
     setFixedSize(QSize(_width, _height));
@@ -88,9 +89,15 @@ void Fader::paintEvent(QPaintEvent *)
     //painter.drawText(dBRect, Qt::AlignCenter, QString::number(static_cast<double>(level), 'f', 1) + QString(" dB"));
 }
 
+void Fader::updateParam(unsigned int *level)
+{
+    // 0dB = 255
+    *level = static_cast<unsigned int>(255+_gainLevel*2);
+}
+
 void Fader::updateGain(float level)
 {
-
+    _gainLevel = level;
 }
 
 void Fader::mouseMoveEvent(QMouseEvent *event)

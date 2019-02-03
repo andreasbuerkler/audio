@@ -20,14 +20,14 @@ class Updater : public QObject
 
 public:
     Updater(IRegisterAccess *registerAccess, QObject *parent);
-    void addElement(uint address, IUpdateElement *element);
+    void addElement(uint address, IUpdateElement *element, bool read);
 
 public slots:
     void update();
 
 private:
     QTimer _timer;
-    QVector<QPair<IUpdateElement *, quint32>> _elementVector;
+    QVector<QPair<IUpdateElement *, QPair<quint32, bool>>> _elementVector;
     IRegisterAccess *_registerAccess;
 };
 

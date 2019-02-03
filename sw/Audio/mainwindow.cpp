@@ -12,10 +12,8 @@
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     _udptransfer(this),
-    _registerAccess(_udptransfer),
-    _registerMock(),
-    _updater(&_registerMock, this),
-    //_updater(&_registerAccess, this),
+    _registerAccess(new RegisterMock()),
+    _updater(_registerAccess, this),
     _ipAddressLabel("IP Address:"),
     _portLabel("UDP Port:"),
     _ipAddressField(),
@@ -74,6 +72,7 @@ MainWindow::~MainWindow()
   //delete _settingsLayout;
   //delete _registerLayout;
   //delete _debugLayout;
+    delete _registerAccess;
     delete _ui;
 }
 
@@ -127,8 +126,10 @@ void MainWindow::setupInput(QGroupBox *group)
     _inputLayout->addWidget(&_levelR, 1, 1);
     group->setLayout(_inputLayout);
 
-    _updater.addElement(0x4, &_meterL);
-    _updater.addElement(0x8, &_meterR);
+    _updater.addElement(0x04, &_meterL, true);
+    _updater.addElement(0x08, &_meterR, true);
+    _updater.addElement(0x0C, &_levelL, false);
+    _updater.addElement(0x10, &_levelR, false);
 }
 
 void MainWindow::setupDebug(QGroupBox *group)
@@ -173,7 +174,7 @@ void MainWindow::onReadButtonPressed()
     } else {
         QVector<quint32> dataVector;
         QString dataString;
-        error = _registerAccess.read(address, dataVector, 1);
+        error = _registerAccess->read(address, dataVector, 1);
         if (error == AUDIO_SUCCESS) {
             dataString.setNum(dataVector.at(0), 16);
             _dataField.setText(dataString);
@@ -197,72 +198,12 @@ void MainWindow::onWriteButtonPressed()
     } else {
         QVector<quint32> dataVector;
         dataVector.append(data);
-        error =_registerAccess.write(address, dataVector);
+        error =_registerAccess->write(address, dataVector);
     }
     statusBar()->showMessage(QString("Register write ") + QString(errorToString(error)), 2000);
 }
 
 void MainWindow::onDebugButtonPressed()
 {
-    // test consecutive read write access
-    int error = AUDIO_SUCCESS;
-
-    QVector<quint32> writeVector;
-    writeVector.append(0x46580465);
-    writeVector.append(0xab678923);
-    writeVector.append(0x890bc892);
-    writeVector.append(0xe7890138);
-    writeVector.append(0xf082789a);
-    writeVector.append(0xb798b012);
-    writeVector.append(0x05df4081);
-    writeVector.append(0x7db89019);
-    writeVector.append(0xab673015);
-    writeVector.append(0x169ba201);
-    writeVector.append(0x48c36016);
-    writeVector.append(0x98f29543);
-    writeVector.append(0x096fb921);
-    writeVector.append(0x95ac2098);
-    writeVector.append(0x76b12afc);
-    error =_registerAccess.write(0x4, writeVector);
-    if (error != AUDIO_SUCCESS) {
-        statusBar()->showMessage(QString("Debug write ") + QString(errorToString(error)), 2000);
-        return;
-    }
-    QVector<quint32> readVector;
-    error = _registerAccess.read(0x4, readVector, 15);
-    if (error != AUDIO_SUCCESS) {
-        statusBar()->showMessage(QString("Debug read ") + QString(errorToString(error)), 2000);
-        return;
-    }
-    if (writeVector.length() != readVector.length()) {
-        statusBar()->showMessage(QString("Debug length ") + QString(errorToString(error)), 2000);
-        return;
-    }
-    for (int i=0; i<15; i++) {
-        if (writeVector.at(i) != readVector.at(i)) {
-            statusBar()->showMessage(QString("Debug compare ") + QString(errorToString(error)), 2000);
-            return;
-        }
-    }
-    for (int i=0; i<1000;i++) {
-        QVector<quint32> singleWriteVector;
-        singleWriteVector.append(static_cast<quint32>(i));
-        error =_registerAccess.write(0x4, singleWriteVector);
-        if (error != AUDIO_SUCCESS) {
-            statusBar()->showMessage(QString("Debug write ") + QString(errorToString(error)), 2000);
-            return;
-        }
-        QVector<quint32> singleReadVector;
-        error = _registerAccess.read(0x4, singleReadVector, 1);
-        if (error != AUDIO_SUCCESS) {
-            statusBar()->showMessage(QString("Debug read ") + QString(errorToString(error)), 2000);
-            return;
-        }
-        if (static_cast<quint32>(i) != singleReadVector.at(0)) {
-            statusBar()->showMessage(QString("Debug write iteration ") + QString(errorToString(error)), 2000);
-            return;
-        }
-    }
-
-    statusBar()->showMessage(QString("Debug ") + QString(errorToString(error)), 2000);
+    statusBar()->showMessage(QString("Debug Buton pressed"), 2000);
 }

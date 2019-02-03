@@ -47,41 +47,40 @@ private:
     void setupInput(QGroupBox *group);
     void setupDebug(QGroupBox *group);
 
-    UdpTransfer    _udptransfer;
-    RegisterAccess _registerAccess;
-    RegisterMock   _registerMock;
-    Updater        _updater;
+    UdpTransfer     _udptransfer;
+    IRegisterAccess *_registerAccess;
+    Updater         _updater;
 
-    QLabel         _ipAddressLabel;
-    QLabel         _portLabel;
-    QLineEdit      _ipAddressField;
-    QLineEdit      _portField;
-    QPushButton    _changeSettingsButton;
+    QLabel          _ipAddressLabel;
+    QLabel          _portLabel;
+    QLineEdit       _ipAddressField;
+    QLineEdit       _portField;
+    QPushButton     _changeSettingsButton;
 
-    QLabel         _addressLabel;
-    QLabel         _dataLabel;
-    QPushButton    _readButton;
-    QPushButton    _writeButton;
-    QLineEdit      _addressField;
-    QLineEdit      _dataField;
+    QLabel          _addressLabel;
+    QLabel          _dataLabel;
+    QPushButton     _readButton;
+    QPushButton     _writeButton;
+    QLineEdit       _addressField;
+    QLineEdit       _dataField;
 
-    QPushButton    _debugButton;
-    Meter          _meterL;
-    Meter          _meterR;
-    Fader          _levelL;
-    Fader          _levelR;
-    QGroupBox      *_settingsGroup;
-    QGroupBox      *_registerGroup;
-    QGroupBox      *_inputGroup;
-    QGroupBox      *_debugGroup;
-    QWidget        *_centralWidget;
-    QGridLayout    *_settingsLayout;
-    QGridLayout    *_registerLayout;
-    QGridLayout    *_inputLayout;
-    QGridLayout    *_debugLayout;
-    QGridLayout    *_mainLayout;
+    QPushButton     _debugButton;
+    Meter           _meterL;
+    Meter           _meterR;
+    Fader           _levelL;
+    Fader           _levelR;
+    QGroupBox       *_settingsGroup;
+    QGroupBox       *_registerGroup;
+    QGroupBox       *_inputGroup;
+    QGroupBox       *_debugGroup;
+    QWidget         *_centralWidget;
+    QGridLayout     *_settingsLayout;
+    QGridLayout     *_registerLayout;
+    QGridLayout     *_inputLayout;
+    QGridLayout     *_debugLayout;
+    QGridLayout     *_mainLayout;
 
-    Ui::MainWindow *_ui;
+    Ui::MainWindow  *_ui;
 
 };
 
