@@ -123,7 +123,9 @@ set_global_assignment -name OUTPUT_IO_TIMING_NEAR_END_VMEAS "HALF VCCIO" -rise
 set_global_assignment -name OUTPUT_IO_TIMING_NEAR_END_VMEAS "HALF VCCIO" -fall
 set_global_assignment -name OUTPUT_IO_TIMING_FAR_END_VMEAS "HALF SIGNAL SWING" -rise
 set_global_assignment -name OUTPUT_IO_TIMING_FAR_END_VMEAS "HALF SIGNAL SWING" -fall
-set_global_assignment -name VHDL_FILE ../source/i2s_clock_converter.vhd
+set_global_assignment -name VHDL_FILE ../source/log_cos_data_rom.vhd
+set_global_assignment -name VHDL_FILE ../source/crossfader.vhd
+set_global_assignment -name VHDL_FILE ../source/clock_converter.vhd
 set_global_assignment -name VHDL_FILE ../source/meter.vhd
 set_global_assignment -name VHDL_FILE ../source/registerbank.vhd
 set_global_assignment -name VHDL_FILE ../source/eth_ctrl.vhd

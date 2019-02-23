@@ -173,6 +173,30 @@ architecture rtl of audio_top is
         level_strobe_o : out std_logic);
     end component meter;
 
+    component crossfader is
+    generic (
+        data_width_g : natural);
+    port (
+        audio_clk_i       : in  std_logic;
+        register_clk_i    : in  std_logic;
+        -- audio in
+        m_left_valid_i    : in  std_logic;
+        m_right_valid_i   : in  std_logic;
+        m_data_i          : in  std_logic_vector(data_width_g-1 downto 0);
+        s_left_valid_i    : in  std_logic;
+        s_right_valid_i   : in  std_logic;
+        s_data_i          : in  std_logic_vector(data_width_g-1 downto 0);
+        -- audio out
+        left_valid_o      : out std_logic;
+        right_valid_o     : out std_logic;
+        data_o            : out std_logic_vector(data_width_g-1 downto 0);
+        -- control
+        m_level_valid_l_i : in  std_logic;
+        m_level_valid_r_i : in  std_logic;
+        m_level_l_i       : in  std_logic_vector(7 downto 0);
+        m_level_r_i       : in  std_logic_vector(7 downto 0));
+    end component crossfader;
+
     constant ctrl_address_width_c : positive := 16;
     constant ctrl_data_width_c    : positive := 32;
 
@@ -194,6 +218,8 @@ architecture rtl of audio_top is
     constant register_address_version_c    : natural  := 0;
     constant register_address_in_meter_r_c : natural  := 1;
     constant register_address_in_meter_l_c : natural  := 2;
+    constant register_address_in_fader_r_c : natural  := 3;
+    constant register_address_in_fader_l_c : natural  := 4;
 
     constant register_init_c      : std_logic_array_32(register_count_c-1 downto 0) :=
                                    (register_address_version_c    => x"BEEF0123",
@@ -202,11 +228,15 @@ architecture rtl of audio_top is
                                    (register_address_version_c    => '1',
                                     register_address_in_meter_r_c => '1',
                                     register_address_in_meter_l_c => '1',
+                                    register_address_in_fader_r_c => '0',
+                                    register_address_in_fader_l_c => '0',
                                     others                        => '0');
     constant register_mask_c      : std_logic_array_32(register_count_c-1 downto 0) :=
                                    (register_address_version_c    => x"ffffffff",
                                     register_address_in_meter_r_c => x"000000ff",
                                     register_address_in_meter_l_c => x"000000ff",
+                                    register_address_in_fader_r_c => x"000000ff",
+                                    register_address_in_fader_l_c => x"000000ff",
                                     others                        => x"ffffffff");
 
     -- reset
@@ -254,14 +284,21 @@ architecture rtl of audio_top is
     signal ctrl_ack      : std_logic;
 
     -- registerbank
-    signal register_read_data : std_logic_array_32(register_count_c-1 downto 0) := (others => (others => '0'));
-    signal register_read_strb : std_logic_vector(register_count_c-1 downto 0) := (others => '0');
-    signal register_was_read  : std_logic_vector(register_count_c-1 downto 0);
+    signal register_read_data  : std_logic_array_32(register_count_c-1 downto 0) := (others => (others => '0'));
+    signal register_read_strb  : std_logic_vector(register_count_c-1 downto 0) := (others => '0');
+    signal register_was_read   : std_logic_vector(register_count_c-1 downto 0);
+    signal register_write_data : std_logic_array_32(register_count_c-1 downto 0) := (others => (others => '0'));
+    signal register_write_strb : std_logic_vector(register_count_c-1 downto 0);
 
     -- input meter
     signal in_meter_r_level : std_logic_vector(7 downto 0);
     signal in_meter_l_level : std_logic_vector(7 downto 0);
     signal in_meter_strobe  : std_logic;
+
+    -- input fader
+    signal fader_l_valid : std_logic;
+    signal fader_r_valid : std_logic;
+    signal fader_data    : std_logic_vector(23 downto 0);
 
 begin
 
@@ -319,9 +356,32 @@ begin
         right_valid_o => audio_r_valid,
         left_valid_o  => audio_l_valid,
         data_o        => audio_data,
-        right_valid_i => audio_r_valid,
-        left_valid_i  => audio_l_valid,
-        data_i        => audio_data);
+        right_valid_i => fader_r_valid,
+        left_valid_i  => fader_l_valid,
+        data_i        => fader_data);
+
+    i_input_fader : crossfader
+    generic map (
+        data_width_g => 24)
+    port map (
+        audio_clk_i       => clk12_288_i,
+        register_clk_i    => clk50_000_i,
+        -- audio in
+        m_left_valid_i    => audio_l_valid,
+        m_right_valid_i   => audio_r_valid,
+        m_data_i          => audio_data,
+        s_left_valid_i    => '0',
+        s_right_valid_i   => '0',
+        s_data_i          => x"000000",
+        -- audio out
+        left_valid_o      => fader_l_valid,
+        right_valid_o     => fader_r_valid,
+        data_o            => fader_data,
+        -- control
+        m_level_valid_l_i => register_write_strb(register_address_in_fader_l_c),
+        m_level_valid_r_i => register_write_strb(register_address_in_fader_r_c),
+        m_level_l_i       => register_write_data(register_address_in_fader_l_c)(7 downto 0),
+        m_level_r_i       => register_write_data(register_address_in_fader_r_c)(7 downto 0));
 
     i_mac : eth_mac
     generic map (
@@ -388,8 +448,8 @@ begin
         -- register
         data_i         => register_read_data,
         data_strb_i    => register_read_strb,
-        data_o         => open,
-        data_strb_o    => open,
+        data_o         => register_write_data,
+        data_strb_o    => register_write_strb,
         read_strb_o    => register_was_read,
         -- ctrl bus
         ctrl_address_i => ctrl_address(ctrl_address_width_c-1 downto 2),

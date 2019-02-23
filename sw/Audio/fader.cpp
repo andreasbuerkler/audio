@@ -26,7 +26,7 @@ Fader::Fader() :
     _lineHeight(6),
     _moveEnable(false),
     _sliderActive(false),
-    _rangedB(80),
+    _rangedB(40),
     _sliderSpacing(10),
     _numberOfMarkers(8),
     _gainLevel(0)
@@ -58,7 +58,11 @@ void Fader::paintEvent(QPaintEvent *)
         float offset = border+lineWidth/static_cast<float>(_numberOfMarkers)*i;
         painter.drawLine(static_cast<int>(offset), 20, static_cast<int>(offset), _height-5);
         QRect textRect(static_cast<int>(offset)-10, 0, 20, 20);
-        painter.drawText(textRect, Qt::AlignCenter, QString::number(textdB));
+        if (i == 0) {
+            painter.drawText(textRect, Qt::AlignCenter, "-∞");
+        } else {
+            painter.drawText(textRect, Qt::AlignCenter, QString::number(textdB));
+        }
         textdB += _rangedB/_numberOfMarkers;
     }
 
@@ -91,8 +95,13 @@ void Fader::paintEvent(QPaintEvent *)
 
 void Fader::updateParam(unsigned int *level)
 {
-    // 0dB = 255
-    *level = static_cast<unsigned int>(255+_gainLevel*2);
+    if (_gainLevel <= -40) {
+        // mute = 200
+        *level = 200;
+    } else {
+        // 0dB = 0
+        *level = static_cast<unsigned int>(-_gainLevel*2);
+    }
 }
 
 void Fader::updateGain(float level)

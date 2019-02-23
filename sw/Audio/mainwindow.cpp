@@ -12,7 +12,8 @@
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     _udptransfer(this),
-    _registerAccess(new RegisterMock()),
+    //_registerAccess(new RegisterMock()),
+    _registerAccess(new RegisterAccess(_udptransfer)),
     _updater(_registerAccess, this),
     _ipAddressLabel("IP Address:"),
     _portLabel("UDP Port:"),

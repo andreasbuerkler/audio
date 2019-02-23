@@ -11,6 +11,7 @@ if { $::argc != 1 } {
     vcom ../source/fifo.vhd -check_synthesis
     vcom ../source/ram.vhd -check_synthesis
     vcom ../source/registerbank.vhd -check_synthesis
+    vcom ../source/clock_converter.vhd -check_synthesis
 
     # eth mac
     vcom ../source/rmii_interface.vhd -check_synthesis
@@ -38,12 +39,11 @@ if { $::argc != 1 } {
     vcom ../source/i2c_config.vhd -check_synthesis
     vcom ../source/i2c_slave.vhd -check_synthesis
 
-    # i2s
-    vcom ../source/i2s_inout.vhd -check_synthesis
-    vcom ../source/i2s_clock_converter.vhd -check_synthesis
-
     # audio
+    vcom ../source/i2s_inout.vhd -check_synthesis
+    vcom ../source/log_cos_data_rom.vhd -check_synthesis
     vcom ../source/meter.vhd -check_synthesis
+    vcom ../source/crossfader.vhd -check_synthesis
 
     # top level
     vcom ../source/audio_top.vhd -check_synthesis
@@ -59,6 +59,7 @@ if { $::argc != 1 } {
     vcom ../testbench/eth_subsystem_tb.vhd
     vcom ../testbench/registerbank_tb.vhd
     vcom ../testbench/meter_tb.vhd
+    vcom ../testbench/crossfader_tb.vhd
 
     # start simulation
     set tbName $1

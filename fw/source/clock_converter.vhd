@@ -1,7 +1,7 @@
 --------------------------------------------------------------------------------
 -- Author    : Andreas Buerkler
 -- Date      : 07.10.2018
--- Filename  : i2s_clock_converter.vhd
+-- Filename  : clock_converter.vhd
 -- Changelog : 07.10.2018 - file created
 --------------------------------------------------------------------------------
 
@@ -9,44 +9,43 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
-entity i2s_clock_converter is
+library work;
+use work.fpga_pkg.all;
+
+entity clock_converter is
 generic (
-    DATA_W : natural := 24);
+    data_width_g : natural := 24;
+    channels_g   : natural := 2);
 port (
     in_clk_i      : in  std_logic;
-    right_valid_i : in  std_logic;
-    left_valid_i  : in  std_logic;
-    data_i        : in  std_logic_vector(DATA_W-1 downto 0);
+    valid_i       : in  std_logic_vector(channels_g-1 downto 0);
+    data_i        : in  std_logic_vector(data_width_g-1 downto 0);
     out_clk_i     : in  std_logic;
-    right_valid_o : out std_logic;
-    left_valid_o  : out std_logic;
-    data_o        : out std_logic_vector(DATA_W-1 downto 0));
-end entity i2s_clock_converter;
+    valid_o       : out std_logic_vector(channels_g-1 downto 0);
+    data_o        : out std_logic_vector(data_width_g-1 downto 0));
+end entity clock_converter;
 
-architecture rtl of i2s_clock_converter is
+architecture rtl of clock_converter is
 
-    signal data_r              : std_logic_vector(DATA_W-1 downto 0) := (others => '0');
-    signal left_r              : std_logic := '0';
-    signal right_r             : std_logic := '0';
+    signal data_r              : std_logic_vector(data_width_g-1 downto 0) := (others => '0');
+    signal channel_r           : std_logic_vector(channels_g-1 downto 0);
     signal valid_toggle_r      : std_logic := '0';
 
     signal valid_toggle_vec_r  : std_logic_vector(2 downto 0) := (others => '0');
     signal valid_toggle_copy_r : std_logic := '0';
     signal valid_copy_r        : std_logic := '0';
 
-    signal data_out_r          : std_logic_vector(DATA_W-1 downto 0) := (others => '0');
-    signal left_valid_r        : std_logic := '0';
-    signal right_valid_r       : std_logic := '0';
+    signal data_out_r          : std_logic_vector(data_width_g-1 downto 0) := (others => '0');
+    signal valid_r             : std_logic_vector(channels_g-1 downto 0) := (others => '0');
 
 begin
 
     in_proc : process (in_clk_i)
     begin
         if (rising_edge(in_clk_i)) then
-            if ((right_valid_i = '1') or (left_valid_i = '1')) then
+            if (vector_or(valid_i) = '1') then
                 data_r <= data_i;
-                left_r <= left_valid_i;
-                right_r <= right_valid_i;
+                channel_r <= valid_i;
                 valid_toggle_r <= not valid_toggle_r;
             end if;
         end if;
@@ -66,17 +65,14 @@ begin
         if (rising_edge(out_clk_i)) then
             if (valid_copy_r = '1') then
                 data_out_r <= data_r;
-                left_valid_r <= left_r;
-                right_valid_r <= right_r;
+                valid_r <= channel_r;
             else
-                left_valid_r <= '0';
-                right_valid_r <= '0';
+                valid_r <= (others => '0');
             end if;
         end if;
     end process out_proc;  
 
-    right_valid_o <= right_valid_r;
-    left_valid_o  <= left_valid_r;
-    data_o        <= data_out_r;
+    valid_o <= valid_r;
+    data_o <= data_out_r;
 
 end rtl;
