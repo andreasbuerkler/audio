@@ -16,7 +16,9 @@ package fpga_pkg is
     function vector_and (n : std_logic_vector) return std_logic;
     function checksum_add (n, u : std_logic_vector) return std_logic_vector;
 
+    type std_logic_array_24 is array (natural range <>) of std_logic_vector(23 downto 0);
     type std_logic_array_32 is array (natural range <>) of std_logic_vector(31 downto 0);
+    type std_logic_array    is array (natural range <>, natural range <>) of std_logic;
 
 end fpga_pkg;
 

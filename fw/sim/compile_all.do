@@ -10,6 +10,7 @@ if { $::argc != 1 } {
     vcom ../source/fpga_pkg.vhd -check_synthesis
     vcom ../source/fifo.vhd -check_synthesis
     vcom ../source/ram.vhd -check_synthesis
+    vcom ../source/dual_clock_ram.vhd -check_synthesis
     vcom ../source/registerbank.vhd -check_synthesis
     vcom ../source/clock_converter.vhd -check_synthesis
 
@@ -44,6 +45,8 @@ if { $::argc != 1 } {
     vcom ../source/log_cos_data_rom.vhd -check_synthesis
     vcom ../source/meter.vhd -check_synthesis
     vcom ../source/crossfader.vhd -check_synthesis
+    vcom ../source/step_response_pkg.vhd -check_synthesis
+    vcom ../source/convolution.vhd -check_synthesis
 
     # top level
     vcom ../source/audio_top.vhd -check_synthesis
@@ -60,6 +63,7 @@ if { $::argc != 1 } {
     vcom ../testbench/registerbank_tb.vhd
     vcom ../testbench/meter_tb.vhd
     vcom ../testbench/crossfader_tb.vhd
+    vcom ../testbench/convolution_tb.vhd
 
     # start simulation
     set tbName $1
