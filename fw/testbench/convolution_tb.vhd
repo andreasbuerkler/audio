@@ -12,11 +12,25 @@ use ieee.math_real.all;
 
 library work;
 use work.fpga_pkg.all;
+use work.step_response_pkg.all;
 
 entity convolution_tb is
 end entity convolution_tb;
 
 architecture rtl of convolution_tb is
+
+    type mem_t is array(natural range <>) of std_logic_vector(23 downto 0);
+
+    function convert_init_data(inarray : std_logic_array) return mem_t is
+        variable data_v : mem_t((2**9)-1 downto 0);
+    begin
+        for i in (2**9)-1 downto 0 loop
+            for j in 23 downto 0 loop
+                data_v(i)(j) := inarray(i, j);
+            end loop;
+        end loop;
+        return data_v;
+    end function convert_init_data;
 
     component convolution is
     generic (
@@ -38,6 +52,10 @@ architecture rtl of convolution_tb is
         wr_en_i        : in  std_logic);
     end component convolution;
 
+    constant coeff_c : mem_t := convert_init_data(step_response_c);
+
+    type calc_array is array (natural range <>) of signed(52 downto 0);
+        
     signal clk_audio    : std_logic := '0';
     signal clk_register : std_logic := '0';
     signal clk_en       : boolean := true;
@@ -55,6 +73,11 @@ architecture rtl of convolution_tb is
     signal out_data        : std_logic_vector(23 downto 0);
     signal result_left_r   : std_logic_vector(23 downto 0) := (others => '0');
     signal result_right_r  : std_logic_vector(23 downto 0) := (others => '0');
+
+    signal left_calc_vec_r  : calc_array(511 downto 0) := (others => (others => '0'));
+    signal right_calc_vec_r : calc_array(511 downto 0) := (others => (others => '0'));
+    signal model_left_r     : std_logic_vector(23 downto 0) := (others =>'0');
+    signal model_right_r    : std_logic_vector(23 downto 0) := (others =>'0');
 
 begin
 
@@ -129,5 +152,35 @@ begin
             end if;
         end if;
     end process result_proc;
+
+    model_proc : process (clk_audio)
+    begin
+        if (rising_edge(clk_audio)) then
+            if (i2s_left_valid_r = '1') then
+                for i in 0 to 460 loop
+                    left_calc_vec_r(i) <= left_calc_vec_r(i+1) + resize(signed(i2s_data_r) * signed(coeff_c(i)), 52);
+                end loop;
+            end if;
+            if (i2s_right_valid_r = '1') then
+                for i in 0 to 460 loop
+                    right_calc_vec_r(i) <= right_calc_vec_r(i+1) + resize(signed(i2s_data_r) * signed(coeff_c(i)), 52);
+                end loop;
+            end if;
+            model_left_r <= std_logic_vector(left_calc_vec_r(0)(46 downto 23));
+            model_right_r <= std_logic_vector(right_calc_vec_r(0)(46 downto 23));
+        end if;
+    end process model_proc;
+
+    check_proc : process (clk_audio)
+    begin
+        if (rising_edge(clk_audio)) then
+            if (out_left_valid = '1') then
+                assert (out_data = model_left_r) report "left channel wrong" severity error;
+            end if;
+            if (out_right_valid = '1') then
+                assert (out_data = model_right_r) report "right channel wrong" severity error;
+            end if;
+        end if;
+    end process check_proc;
 
 end rtl;

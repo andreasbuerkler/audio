@@ -48,7 +48,28 @@ end entity audio_top;
 
 architecture rtl of audio_top is
 
-    component i2c_config
+    component audio_pll is
+    port (
+        rst_i    : in  std_logic;
+        clk_i    : in  std_logic;
+        clkx4_o  : out std_logic;
+        locked_o : out std_logic);
+    end component audio_pll;
+
+    component clock_converter is
+    generic (
+        data_width_g : natural;
+        channels_g   : natural);
+    port (
+        in_clk_i  : in  std_logic;
+        valid_i   : in  std_logic_vector(channels_g-1 downto 0);
+        data_i    : in  std_logic_vector(data_width_g-1 downto 0);
+        out_clk_i : in  std_logic;
+        valid_o   : out std_logic_vector(channels_g-1 downto 0);
+        data_o    : out std_logic_vector(data_width_g-1 downto 0));
+    end component clock_converter;
+
+    component i2c_config is
     generic (
         I2C_ADDRESS : std_logic_vector(7 downto 0);
         CONFIG      : std_logic_vector;
@@ -64,7 +85,7 @@ architecture rtl of audio_top is
         sda_o   : out std_logic);
     end component i2c_config;
 
-    component i2s_inout
+    component i2s_inout is
     port (
         m_clk_i       : in  std_logic;
         b_clk_o       : out std_logic;
@@ -197,6 +218,26 @@ architecture rtl of audio_top is
         m_level_r_i       : in  std_logic_vector(7 downto 0));
     end component crossfader;
 
+    component convolution is
+    generic (
+        data_width_g : natural);
+    port (
+        audio_clk_i    : in  std_logic;
+        register_clk_i : in  std_logic;
+        -- audio in
+        left_valid_i   : in  std_logic;
+        right_valid_i  : in  std_logic;
+        data_i         : in  std_logic_vector(data_width_g-1 downto 0);
+        -- audio out
+        left_valid_o   : out std_logic;
+        right_valid_o  : out std_logic;
+        data_o         : out std_logic_vector(data_width_g-1 downto 0);
+        -- control
+        address_i      : in  std_logic_vector(8 downto 0);
+        coeff_i        : in  std_logic_vector(31 downto 0);
+        wr_en_i        : in  std_logic);
+    end component convolution;
+
     constant ctrl_address_width_c : positive := 16;
     constant ctrl_data_width_c    : positive := 32;
 
@@ -238,6 +279,9 @@ architecture rtl of audio_top is
                                     register_address_in_fader_r_c => x"000000ff",
                                     register_address_in_fader_l_c => x"000000ff",
                                     others                        => x"ffffffff");
+
+    -- clocks
+    signal clk49_152 : std_logic;
 
     -- reset
     signal reset_counter_r       : unsigned(23 downto 0) := (others => '0');
@@ -296,11 +340,29 @@ architecture rtl of audio_top is
     signal in_meter_strobe  : std_logic;
 
     -- input fader
-    signal fader_l_valid : std_logic;
-    signal fader_r_valid : std_logic;
-    signal fader_data    : std_logic_vector(23 downto 0);
+    signal fader_l_valid      : std_logic;
+    signal fader_r_valid      : std_logic;
+    signal fader_data         : std_logic_vector(23 downto 0);
+    signal fast_fader_l_valid : std_logic;
+    signal fast_fader_r_valid : std_logic;
+    signal fast_fader_data    : std_logic_vector(23 downto 0);
+
+    -- convolution
+    signal conv_l_valid      : std_logic;
+    signal conv_r_valid      : std_logic;
+    signal conv_data         : std_logic_vector(23 downto 0);
+    signal fast_conv_l_valid : std_logic;
+    signal fast_conv_r_valid : std_logic;
+    signal fast_conv_data    : std_logic_vector(23 downto 0);
 
 begin
+
+    i_pll : audio_pll
+    port map (
+        rst_i    => '0',
+        clk_i    => clk12_288_i,
+        clkx4_o  => clk49_152,
+        locked_o => open);
 
     reset_proc : process (clk12_288_i)
     begin
@@ -356,9 +418,9 @@ begin
         right_valid_o => audio_r_valid,
         left_valid_o  => audio_l_valid,
         data_o        => audio_data,
-        right_valid_i => fader_r_valid,
-        left_valid_i  => fader_l_valid,
-        data_i        => fader_data);
+        right_valid_i => conv_r_valid,
+        left_valid_i  => conv_l_valid,
+        data_i        => conv_data);
 
     i_input_fader : crossfader
     generic map (
@@ -382,6 +444,53 @@ begin
         m_level_valid_r_i => register_write_strb(register_address_in_fader_r_c),
         m_level_l_i       => register_write_data(register_address_in_fader_l_c)(7 downto 0),
         m_level_r_i       => register_write_data(register_address_in_fader_r_c)(7 downto 0));
+
+    i_cc_12to49 : clock_converter
+    generic map (
+        data_width_g => 24,
+        channels_g   => 2)
+    port map (
+        in_clk_i   => clk12_288_i,
+        valid_i(0) => fader_l_valid,
+        valid_i(1) => fader_r_valid,
+        data_i     => fader_data,
+        out_clk_i  => clk49_152,
+        valid_o(0) => fast_fader_l_valid,
+        valid_o(1) => fast_fader_r_valid,
+        data_o     => fast_fader_data);
+
+    i_conv : convolution
+    generic map (
+        data_width_g => 24)
+    port map (
+        audio_clk_i    => clk49_152,
+        register_clk_i => clk50_000_i,
+        -- audio in
+        left_valid_i   => fast_fader_l_valid,
+        right_valid_i  => fast_fader_r_valid,
+        data_i         => fast_fader_data,
+        -- audio out
+        left_valid_o   => fast_conv_l_valid,
+        right_valid_o  => fast_conv_r_valid,
+        data_o         => fast_conv_data,
+        -- control
+        address_i      => "000000000",
+        coeff_i        => x"00000000",
+        wr_en_i        => '0');
+
+    i_cc_49to12 : clock_converter
+    generic map (
+        data_width_g => 24,
+        channels_g   => 2)
+    port map (
+        in_clk_i   => clk49_152,
+        valid_i(0) => fast_conv_l_valid,
+        valid_i(1) => fast_conv_r_valid,
+        data_i     => fast_conv_data,
+        out_clk_i  => clk12_288_i,
+        valid_o(0) => conv_l_valid,
+        valid_o(1) => conv_r_valid,
+        data_o     => conv_data);
 
     i_mac : eth_mac
     generic map (

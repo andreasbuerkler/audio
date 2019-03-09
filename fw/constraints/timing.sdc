@@ -6,8 +6,11 @@
 ##------------------------------------------------------------------------------
 
 # input clocks
-create_clock -name clk50 -period 20 [get_ports clk50_000_i]
-create_clock -name clk12 -period 81 [get_ports clk12_288_i]
+create_clock -name clk50 -period 20.000 [get_ports clk50_000_i]
+create_clock -name clk12 -period 81.380 [get_ports clk12_288_i]
+
+# pll
+create_generated_clock -name audio_fast_clk -divide_by 1 -multiply_by 4 -source [get_ports clk12_288_i] [get_pins {i_pll|i_pll|auto_generated|pll1|clk[0]}]
 
 # output clocks
 create_generated_clock -name audio_mclk -source [get_ports clk12_288_i] [get_ports {i2s_mclk_o}]

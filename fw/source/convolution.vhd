@@ -156,7 +156,7 @@ begin
 
             if (counter_en_r = '1') then
                 coeff_addr_r <= std_logic_vector(unsigned(coeff_addr_r) + 1);
-                rd_addr_r <= std_logic_vector(unsigned(coeff_addr_r) - 1);
+                rd_addr_r <= std_logic_vector(unsigned(coeff_addr_r) + 1);
                 wr_addr_r <= std_logic_vector(unsigned(coeff_addr_r) - 2);
             else
                 coeff_addr_r <= std_logic_vector(to_unsigned(0, coeff_addr_r'length));
@@ -176,10 +176,10 @@ begin
                     left_sel_r <= '1';
                     if (unsigned(coeff_addr_r) = to_unsigned(2, coeff_addr_r'length)) then
                         wr_en_r <= '1';
+                        left_valid_out_r <= '1';
                     elsif (unsigned(coeff_addr_r) = to_unsigned(459+3, coeff_addr_r'length)) then
                         wr_en_r <= '0';
                         counter_en_r <= '0';
-                        left_valid_out_r <= '1';
                         ctrl_fsm_r <= idle_s;
                     else
                         counter_en_r <= '1';
@@ -190,10 +190,10 @@ begin
                     right_present_r <= '0';
                     if (unsigned(coeff_addr_r) = to_unsigned(2, coeff_addr_r'length)) then
                         wr_en_r <= '1';
+                        right_valid_out_r <= '1';
                     elsif (unsigned(coeff_addr_r) = to_unsigned(459+3, coeff_addr_r'length)) then
                         wr_en_r <= '0';
                         counter_en_r <= '0';
-                        right_valid_out_r <= '1';
                         ctrl_fsm_r <= idle_s;
                     else
                         counter_en_r <= '1';
