@@ -47,6 +47,7 @@ if { $::argc != 1 } {
     vcom ../source/crossfader.vhd -check_synthesis
     vcom ../source/step_response_pkg.vhd -check_synthesis
     vcom ../source/convolution.vhd -check_synthesis
+    vcom ../source/sinus_gen.vhd -check_synthesis
 
     # top level
     vcom ../source/audio_top.vhd -check_synthesis
@@ -64,6 +65,7 @@ if { $::argc != 1 } {
     vcom ../testbench/meter_tb.vhd
     vcom ../testbench/crossfader_tb.vhd
     vcom ../testbench/convolution_tb.vhd
+    vcom ../testbench/sinus_gen_tb.vhd
 
     # start simulation
     set tbName $1

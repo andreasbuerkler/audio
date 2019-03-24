@@ -15,6 +15,8 @@ package fpga_pkg is
     function vector_or (n : std_logic_vector) return std_logic;
     function vector_and (n : std_logic_vector) return std_logic;
     function checksum_add (n, u : std_logic_vector) return std_logic_vector;
+    function resize_left_aligned (n : unsigned; u : positive) return unsigned;
+    function resize_left_aligned (n : signed; u : positive) return signed;
 
     type std_logic_array_24 is array (natural range <>) of std_logic_vector(23 downto 0);
     type std_logic_array_32 is array (natural range <>) of std_logic_vector(31 downto 0);
@@ -77,5 +79,31 @@ package body fpga_pkg is
         retval := n_sum(n'length-1 downto 0) + resize(n_sum(n_sum'high downto n'length), retval'length);
         return std_logic_vector(retval);
     end checksum_add;
+
+    function resize_left_aligned (n : unsigned; u : positive) return unsigned is
+        variable retval : unsigned(u-1 downto 0);
+    begin
+        if (n'length > u) then
+            for i in 0 to u-1 loop
+                retval(i) := n((n'length-u)+i);
+            end loop;
+        else
+            retval := n & to_unsigned(0, u-n'length);
+        end if;
+        return retval;
+    end resize_left_aligned;
+
+    function resize_left_aligned (n : signed; u : positive) return signed is
+        variable retval : signed(u-1 downto 0);
+    begin
+        if (n'length > u) then
+            for i in 0 to u-1 loop
+                retval(i) := n((n'length-u)+i);
+            end loop;
+        else
+            retval := n & to_signed(0, u-n'length);
+        end if;
+        return retval;
+    end resize_left_aligned;
 
 end fpga_pkg;
