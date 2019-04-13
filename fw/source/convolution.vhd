@@ -84,10 +84,13 @@ architecture rtl of convolution is
     signal rd_addr_r         : std_logic_vector(8 downto 0) := (others => '0');
     signal rd_addr           : std_logic_vector(9 downto 0);
     signal left_sel_r        : std_logic := '0';
-    signal left_valid_out_r  : std_logic := '0';
-    signal right_valid_out_r : std_logic := '0';
+    signal left_valid_r      : std_logic := '0';
+    signal right_valid_r     : std_logic := '0';
     signal counter_en_r      : std_logic := '0';
     signal right_present_r   : std_logic := '0';
+    signal data_out_r        : std_logic_vector(data_width_g-1 downto 0);
+    signal left_valid_out_r  : std_logic := '0';
+    signal right_valid_out_r : std_logic := '0';
 
 begin
 
@@ -137,18 +140,28 @@ begin
                   data_right_r;
 
     mul_acc_proc : process (audio_clk_i)
+        variable add_v : std_logic_vector(sign_bits_c+coeff_width_c+data_width_g-1 downto 0);
     begin
         if (rising_edge(audio_clk_i)) then
             mul_r <= std_logic_vector(signed(data_input) * signed(coeff));
-            add_r <= std_logic_vector(resize(signed(mul_r), add_r'length) + signed(rd_data));
+            add_v := std_logic_vector(resize(signed(mul_r), add_r'length) + signed(rd_data));
+            if ((add_v(add_v'high downto add_v'high-1) = "10") and (rd_data(rd_data'high downto rd_data'high-1) = "01")) then
+                -- overflow
+                add_r <= '0' & std_logic_vector(to_signed(-1, sign_bits_c+coeff_width_c+data_width_g-1));
+            elsif ((add_v(add_v'high downto add_v'high-1) = "01") and (rd_data(rd_data'high downto rd_data'high-1) = "10")) then
+                -- underflow
+                add_r <= '1' & std_logic_vector(to_signed(0, sign_bits_c+coeff_width_c+data_width_g-1));
+            else
+                add_r <= add_v;
+            end if;
         end if;
     end process mul_acc_proc;
 
     ctrl_proc : process (audio_clk_i)
     begin
         if (rising_edge(audio_clk_i)) then
-            left_valid_out_r <= '0';
-            right_valid_out_r <= '0';
+            left_valid_r <= '0';
+            right_valid_r <= '0';
 
             if (right_valid_i = '1') then
                 right_present_r <= '1';
@@ -176,7 +189,7 @@ begin
                     left_sel_r <= '1';
                     if (unsigned(coeff_addr_r) = to_unsigned(2, coeff_addr_r'length)) then
                         wr_en_r <= '1';
-                        left_valid_out_r <= '1';
+                        left_valid_r <= '1';
                     elsif (unsigned(coeff_addr_r) = to_unsigned(459+3, coeff_addr_r'length)) then
                         wr_en_r <= '0';
                         counter_en_r <= '0';
@@ -190,7 +203,7 @@ begin
                     right_present_r <= '0';
                     if (unsigned(coeff_addr_r) = to_unsigned(2, coeff_addr_r'length)) then
                         wr_en_r <= '1';
-                        right_valid_out_r <= '1';
+                        right_valid_r <= '1';
                     elsif (unsigned(coeff_addr_r) = to_unsigned(459+3, coeff_addr_r'length)) then
                         wr_en_r <= '0';
                         counter_en_r <= '0';
@@ -204,8 +217,25 @@ begin
         end if;
     end process ctrl_proc;
 
+    truncate_proc : process (audio_clk_i)
+    begin
+        if (rising_edge(audio_clk_i)) then
+            if (add_r(add_r'high downto add_r'high-sign_bits_c-1) = std_logic_vector(to_signed(0, sign_bits_c+2))) then
+                data_out_r <= add_r(add_r'high-sign_bits_c-1 downto data_width_g-1);
+            elsif (add_r(add_r'high downto add_r'high-sign_bits_c-1) = std_logic_vector(to_signed(-1, sign_bits_c+2))) then
+                data_out_r <= add_r(add_r'high-sign_bits_c-1 downto data_width_g-1);
+            elsif (add_r(add_r'high) = '1') then
+                data_out_r <= '1' & std_logic_vector(to_signed(0, data_width_g-1));
+            else
+                data_out_r <= '0' & std_logic_vector(to_signed(-1, data_width_g-1));
+            end if;
+            left_valid_out_r <= left_valid_r;
+            right_valid_out_r <= right_valid_r;
+        end if;
+    end process truncate_proc;
+
     left_valid_o <= left_valid_out_r;
     right_valid_o <= right_valid_out_r;
-    data_o <= add_r(add_r'high-sign_bits_c-1 downto data_width_g-1);
+    data_o <= data_out_r;
 
 end rtl;

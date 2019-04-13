@@ -22,7 +22,8 @@ port (
     -- audio in
     request_i      : in  std_logic;
     -- audio out
-    valid_o        : out std_logic;
+    valid_sin_o    : out std_logic;
+    valid_cos_o    : out std_logic;
     data_o         : out std_logic_vector(data_width_g-1 downto 0);
     -- control
     increment_i    : in  std_logic_vector(31 downto 0);
@@ -70,17 +71,18 @@ architecture rtl of sinus_gen is
     signal address_r          : std_logic_vector(log2ceil(number_of_samples_c)-1 downto 0) := (others => '0');
     signal phase_r            : std_logic_vector(31 downto 0) := (others => '0');
     signal quadrant_r         : std_logic_vector(1 downto 0) := (others => '0');
-    signal quadrant2_r        : std_logic_vector(1 downto 0) := (others => '0');
-    signal quadrant3_r        : std_logic_vector(1 downto 0) := (others => '0');
     signal sin_r              : std_logic_vector(data_width_g-1 downto 0) := lookup_cos_c(0);
+    signal cos_r              : std_logic_vector(data_width_g-1 downto 0) := lookup_cos_c(0);
     signal address_invert_r   : std_logic := '0';
-    signal strb_vec_r         : std_logic_vector(8 downto 0) := (others => '0');
-    signal cos_r              : std_logic_vector(gradient_width_c-1 downto 0) := (others => '0');
-    signal cos_raw_r          : std_logic_vector(gradient_width_c-1 downto 0) := (others => '0');
+    signal strb_vec_r         : std_logic_vector(9 downto 0) := (others => '0');
+    signal int_cos_r          : std_logic_vector(gradient_width_c-1 downto 0) := (others => '0');
+    signal int_cos_raw_r      : std_logic_vector(gradient_width_c-1 downto 0) := (others => '0');
+    signal int_sin_r          : std_logic_vector(gradient_width_c-1 downto 0) := (others => '0');
+    signal int_sin_raw_r      : std_logic_vector(gradient_width_c-1 downto 0) := (others => '0');
     signal mul_a              : signed(gradient_width_c-1 downto 0);
     signal mul_b              : signed(gradient_width_c-1 downto 0);
     signal mul_r              : std_logic_vector(2*gradient_width_c-1 downto 0) := (others => '0');
-    signal sin_interpolated_r : std_logic_vector(data_width_g-1 downto 0) := (others => '0');
+    signal interpolated_r     : std_logic_vector(data_width_g-1 downto 0) := (others => '0');
 
 begin
 
@@ -117,7 +119,6 @@ begin
     address_proc : process (audio_clk_i)
     begin
         if (rising_edge(audio_clk_i)) then
-            quadrant2_r <= quadrant_r;
             strb_vec_r(1) <= strb_vec_r(0);
             if (address_invert_r = '1') then
                 address_r <= std_logic_vector(to_unsigned(number_of_samples_c-1, address_r'length) - unsigned(phase_r(phase_r'high downto phase_r'high-address_r'length+1)));
@@ -130,15 +131,18 @@ begin
     rom_proc : process (audio_clk_i)
     begin
         if (rising_edge(audio_clk_i)) then
-            quadrant3_r <= quadrant2_r;
             strb_vec_r(2) <= strb_vec_r(1);
             lookup_value_r <= lookup_cos_c(to_integer(unsigned(address_r)));
         end if;
     end process rom_proc;
 
-    mul_a <= signed(cos_raw_r) when (strb_vec_r(6) /= '1') else
-             signed(cos_r);
-    mul_b <= sin_mult_c when (strb_vec_r(6) /= '1') else
+    mul_a <= signed(int_cos_raw_r) when ((strb_vec_r(3) = '1') and (quadrant_r(0) = '0')) or ((strb_vec_r(4) = '1') and (quadrant_r(0) = '1')) else
+             signed(int_sin_raw_r) when ((strb_vec_r(4) = '1') and (quadrant_r(0) = '0')) or ((strb_vec_r(5) = '1') and (quadrant_r(0) = '1')) else
+             signed(int_cos_r)     when ((strb_vec_r(5) = '1') and (quadrant_r(0) = '0')) or ((strb_vec_r(6) = '1') and (quadrant_r(0) = '1')) else
+             signed(int_sin_r);
+   
+    mul_b <= sin_mult_c when ((strb_vec_r(3) = '1') and (quadrant_r(0) = '0')) or ((strb_vec_r(4) = '1') and (quadrant_r(0) = '1')) or
+                             ((strb_vec_r(4) = '1') and (quadrant_r(0) = '0')) or ((strb_vec_r(5) = '1') and (quadrant_r(0) = '1')) else
              signed('0' & phase_r(phase_r'high-address_r'length downto phase_r'high-address_r'length-gradient_width_c+2));
 
     mul_proc : process (audio_clk_i)
@@ -157,62 +161,86 @@ begin
             strb_vec_r(6) <= strb_vec_r(5);
             strb_vec_r(7) <= strb_vec_r(6);
             strb_vec_r(8) <= strb_vec_r(7);
+            strb_vec_r(9) <= strb_vec_r(8);
 
-            case (quadrant3_r) is
+            case (quadrant_r) is
                 when "00"   =>
                     if (strb_vec_r(2) = '1') then
-                        cos_raw_r <= std_logic_vector(to_unsigned(0, gradient_width_c) - unsigned(lookup_value_r(lookup_value_r'high downto lookup_value_r'high-gradient_width_c+1)));
-                    end if;
-                    if (strb_vec_r(4) = '1') then
-                        cos_r <= mul_r(mul_r'high-1 downto mul_r'high-gradient_width_c);
+                        int_cos_raw_r <= std_logic_vector(to_unsigned(0, gradient_width_c) - unsigned(lookup_value_r(lookup_value_r'high downto lookup_value_r'high-gradient_width_c+1)));
+                        cos_r <= std_logic_vector(to_unsigned(0, data_width_g) - unsigned(lookup_value_r));
                     end if;
                     if (strb_vec_r(3) = '1') then
+                        int_sin_raw_r <= lookup_value_r(lookup_value_r'high downto lookup_value_r'high-gradient_width_c+1);
                         sin_r <= lookup_value_r;
+                    end if;
+                    if (strb_vec_r(4) = '1') then
+                        int_cos_r <= mul_r(mul_r'high-1 downto mul_r'high-gradient_width_c);
+                    end if;
+                    if (strb_vec_r(5) = '1') then
+                        int_sin_r <= mul_r(mul_r'high-1 downto mul_r'high-gradient_width_c);
                     end if;
 
                 when "01"   =>
                     if (strb_vec_r(3) = '1') then
-                        cos_raw_r <= std_logic_vector(to_unsigned(0, gradient_width_c) - unsigned(lookup_value_r(lookup_value_r'high downto lookup_value_r'high-gradient_width_c+1)));
-                    end if;
-                    if (strb_vec_r(5) = '1') then
-                        cos_r <= mul_r(mul_r'high-1 downto mul_r'high-gradient_width_c);
+                        int_cos_raw_r <= std_logic_vector(to_unsigned(0, gradient_width_c) - unsigned(lookup_value_r(lookup_value_r'high downto lookup_value_r'high-gradient_width_c+1)));
+                        cos_r <= std_logic_vector(to_unsigned(0, data_width_g) - unsigned(lookup_value_r));
                     end if;
                     if (strb_vec_r(4) = '1') then
+                        int_sin_raw_r <= std_logic_vector(to_unsigned(0, gradient_width_c) - unsigned(lookup_value_r(lookup_value_r'high downto lookup_value_r'high-gradient_width_c+1)));
                         sin_r <= std_logic_vector(to_unsigned(0, data_width_g) - unsigned(lookup_value_r));
+                    end if;
+                    if (strb_vec_r(5) = '1') then
+                        int_cos_r <= mul_r(mul_r'high-1 downto mul_r'high-gradient_width_c);
+                    end if;
+                    if (strb_vec_r(6) = '1') then
+                        int_sin_r <= mul_r(mul_r'high-1 downto mul_r'high-gradient_width_c);
                     end if;
 
                 when "10"   =>
                     if (strb_vec_r(2) = '1') then
-                        cos_raw_r <= lookup_value_r(lookup_value_r'high downto lookup_value_r'high-gradient_width_c+1);
-                    end if;
-                    if (strb_vec_r(4) = '1') then
-                        cos_r <= mul_r(mul_r'high-1 downto mul_r'high-gradient_width_c);
+                        int_cos_raw_r <= lookup_value_r(lookup_value_r'high downto lookup_value_r'high-gradient_width_c+1);
+                        cos_r <= lookup_value_r;
                     end if;
                     if (strb_vec_r(3) = '1') then
+                        int_sin_raw_r <= std_logic_vector(to_unsigned(0, gradient_width_c) - unsigned(lookup_value_r(lookup_value_r'high downto lookup_value_r'high-gradient_width_c+1)));
                         sin_r <= std_logic_vector(to_unsigned(0, data_width_g) - unsigned(lookup_value_r));
+                    end if;
+                    if (strb_vec_r(4) = '1') then
+                        int_cos_r <= mul_r(mul_r'high-1 downto mul_r'high-gradient_width_c);
+                    end if;
+                    if (strb_vec_r(5) = '1') then
+                        int_sin_r <= mul_r(mul_r'high-1 downto mul_r'high-gradient_width_c);
                     end if;
 
                 when others =>
                     if (strb_vec_r(3) = '1') then
-                        cos_raw_r <= lookup_value_r(lookup_value_r'high downto lookup_value_r'high-gradient_width_c+1);
-                    end if;
-                    if (strb_vec_r(5) = '1') then
-                        cos_r <= mul_r(mul_r'high-1 downto mul_r'high-gradient_width_c);
+                        int_cos_raw_r <= lookup_value_r(lookup_value_r'high downto lookup_value_r'high-gradient_width_c+1);
+                        cos_r <= lookup_value_r;
                     end if;
                     if (strb_vec_r(4) = '1') then
+                        int_sin_raw_r <= lookup_value_r(lookup_value_r'high downto lookup_value_r'high-gradient_width_c+1);
                         sin_r <= lookup_value_r;
+                    end if;
+                    if (strb_vec_r(5) = '1') then
+                        int_cos_r <= mul_r(mul_r'high-1 downto mul_r'high-gradient_width_c);
+                    end if;
+                    if (strb_vec_r(6) = '1') then
+                        int_sin_r <= mul_r(mul_r'high-1 downto mul_r'high-gradient_width_c);
                     end if;
 
             end case;
 
-            if (strb_vec_r(7) = '1') then
-                sin_interpolated_r <= std_logic_vector(signed(sin_r) + resize(signed(mul_r(mul_r'high-1 downto mul_r'high-gradient_width_c)), sin_interpolated_r'length));
+            if (((strb_vec_r(6) = '1') and (quadrant_r(0) = '0')) or ((strb_vec_r(7) = '1') and (quadrant_r(0) = '1'))) then
+                interpolated_r <= std_logic_vector(signed(sin_r) + resize(signed(mul_r(mul_r'high-1 downto mul_r'high-gradient_width_c)), interpolated_r'length));
+            elsif (((strb_vec_r(7) = '1') and (quadrant_r(0) = '0')) or ((strb_vec_r(8) = '1') and (quadrant_r(0) = '1'))) then
+                interpolated_r <= std_logic_vector(signed(cos_r) - resize(signed(mul_r(mul_r'high-1 downto mul_r'high-gradient_width_c)), interpolated_r'length));
             end if;
 
         end if;
     end process quad_proc;
 
-    valid_o <= strb_vec_r(8);
-    data_o <= sin_interpolated_r;
+    valid_sin_o <= (strb_vec_r(7) and (not quadrant_r(0))) or (strb_vec_r(8) and quadrant_r(0));
+    valid_cos_o <= (strb_vec_r(8) and (not quadrant_r(0))) or (strb_vec_r(9) and quadrant_r(0));
+    data_o <= interpolated_r;
 
 end rtl;

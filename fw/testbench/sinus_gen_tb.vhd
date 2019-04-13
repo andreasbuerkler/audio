@@ -27,7 +27,8 @@ architecture rtl of sinus_gen_tb is
         -- audio in
         request_i      : in  std_logic;
         -- audio out
-        valid_o        : out std_logic;
+        valid_sin_o    : out std_logic;
+        valid_cos_o    : out std_logic;
         data_o         : out std_logic_vector(data_width_g-1 downto 0);
         -- control
         increment_i    : in  std_logic_vector(31 downto 0);
@@ -41,11 +42,17 @@ architecture rtl of sinus_gen_tb is
     signal trigger_r         : std_logic := '0';
     signal trigger_counter_r : integer := 0;
 
-    signal phase_r   : real := 0.0;
-    signal sin_r     : std_logic_vector(23 downto 0);
-    signal dut_valid : std_logic;
-    signal dut_sin   : std_logic_vector(23 downto 0);
-    signal diff_r    : std_logic_vector(23 downto 0);
+    signal phase_r       : real := 0.0;
+    signal sin_r         : std_logic_vector(23 downto 0);
+    signal cos_r         : std_logic_vector(23 downto 0);
+    signal dut_sin_valid : std_logic;
+    signal dut_cos_valid : std_logic;
+    signal dut_data      : std_logic_vector(23 downto 0);
+    signal diff_sin_r    : std_logic_vector(23 downto 0);
+    signal diff_cos_r    : std_logic_vector(23 downto 0);
+
+    signal gen_sin_r : std_logic_vector(23 downto 0) := (others => '0');
+    signal gen_cos_r : std_logic_vector(23 downto 0) := (others => '0');
 
 begin
 
@@ -93,11 +100,24 @@ begin
         -- audio in
         request_i      => trigger_r,
         -- audio out
-        valid_o        => dut_valid,
-        data_o         => dut_sin,
+        valid_sin_o    => dut_sin_valid,
+        valid_cos_o    => dut_cos_valid,
+        data_o         => dut_data,
         -- control
         increment_i    => x"00400000",
         change_i       => '1');
+
+    reg_proc : process (clk_audio)
+    begin
+        if (rising_edge(clk_audio)) then
+            if (dut_sin_valid = '1') then
+                gen_sin_r <= dut_data;
+            end if;
+            if (dut_cos_valid = '1') then
+                gen_cos_r <= dut_data;
+            end if;
+        end if;
+    end process reg_proc;
 
     model_proc : process (clk_audio)
         variable phase_v : real := 0.0;
@@ -107,9 +127,13 @@ begin
                 phase_v := phase_r + (2.0*MATH_PI/(4096.0-8.0));
                 phase_r <= phase_v;
                 sin_r <= std_logic_vector(to_signed(integer(cos(phase_v)*((2.0**23.0)-1.0)), 24));
+                cos_r <= std_logic_vector(to_signed(-integer(sin(phase_v)*((2.0**23.0)-1.0)), 24));
             end if;
-            if (dut_valid = '1') then
-                diff_r <= std_logic_vector(signed(dut_sin) - signed(sin_r));
+            if (dut_sin_valid = '1') then
+                diff_sin_r <= std_logic_vector(signed(dut_data) - signed(sin_r));
+            end if;
+            if (dut_cos_valid = '1') then
+                diff_cos_r <= std_logic_vector(signed(dut_data) - signed(cos_r));
             end if;
         end if;
     end process model_proc;
