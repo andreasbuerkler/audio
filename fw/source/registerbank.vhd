@@ -4,6 +4,7 @@
 -- Filename  : registerbank.vhd
 -- Changelog : 28.12.2018 - file created
 --             13.01.2019 - read strobe added
+--             31.12.2019 - write ack added
 --------------------------------------------------------------------------------
 
 library ieee;
@@ -75,7 +76,6 @@ begin
     read_proc : process (clk_i)
     begin
         if (rising_edge(clk_i)) then
-            ctrl_ack_r <= '0';
             read_strb_r <= (others => '0');
             for i in 0 to register_count_g-1 loop
                 if ((ctrl_strobe_i = '1') and (ctrl_write_i = '0')) then
@@ -84,12 +84,18 @@ begin
                         for j in 0 to data_width_g-1 loop
                             ctrl_data_r(j) <= register_r(i)(j) and register_mask_g(i)(j);
                         end loop;
-                        ctrl_ack_r <= '1';
                     end if;
                 end if;
             end loop;
         end if;
     end process read_proc;
+
+    ack_proc : process (clk_i)
+    begin
+        if (rising_edge(clk_i)) then
+            ctrl_ack_r <= ctrl_strobe_i;
+        end if;
+    end process ack_proc;
 
     data_o <= register_r;
     data_strb_o <= data_strb_r;

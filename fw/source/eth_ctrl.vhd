@@ -3,6 +3,7 @@
 -- Date      : 27.12.2018
 -- Filename  : eth_ctrl.vhd
 -- Changelog : 27.12.2018 - file created
+--           : 32.12.2019 - write ack added
 --------------------------------------------------------------------------------
 
 library ieee;
@@ -48,13 +49,14 @@ architecture rtl of eth_ctrl is
     constant bytes_per_transfer_c    : positive := data_width_g / 8;
 
     type rx_fsm_t is (idle_s, id_s, command_s, addr_size_s, addr_s, data_size_s,
-                      write_s, read_s, wait_for_done_s, wait_for_end_s);
+                      write_s, write_ack_s, read_s, wait_for_done_s, wait_for_end_s);
 
     type tx_fsm_t is (idle_s, packet_nr_s, id_s, command_s,
                       data_size_s, data_s, last_byte_s, wait_for_next_byte_s);
 
     signal rx_fsm_r             : rx_fsm_t := idle_s;
     signal udp_ready_r          : std_logic := '0';
+    signal last_store_r         : std_logic := '0';
     signal address_r            : std_logic_vector(address_width_g-1 downto 0) := (others => '0');
     signal rx_data_r            : std_logic_vector(data_width_g-1 downto 0) := (others => '0');
     signal tx_data_r            : std_logic_vector(data_width_g-1 downto 0) := (others => '0');
@@ -66,12 +68,13 @@ architecture rtl of eth_ctrl is
     signal command_read_r       : std_logic := '0';
     signal size_counter_r       : unsigned(7 downto 0) := (others => '0');
     signal send_response_r      : std_logic := '0';
+    signal ack_received_r       : std_logic := '0';
 
     signal tx_fsm_r             : tx_fsm_t := idle_s;
     signal udp_valid_r          : std_logic := '0';
     signal udp_last_r           : std_logic := '0';
     signal udp_data_r           : std_logic_vector(7 downto 0) := (others => '0');
-    signal timeout_counter_r    : unsigned(9 downto 0) := (others => '0');
+    signal timeout_counter_r    : unsigned(15 downto 0) := (others => '0');
     signal timeout_counter_en_r : std_logic := '0';
     signal timeout_active_r     : std_logic := '0';
     signal data_counter_r       : unsigned(log2ceil(bytes_per_transfer_c)-1 downto 0) := (others => '0');
@@ -156,16 +159,25 @@ begin
                         if (size_counter_r(1 downto 0) = "01") then -- TODO: only for 32 bit data
                             strobe_r <= '1';
                             write_r <= '1';
+                            udp_ready_r <= '0';
+                            last_store_r <= udp_last_i;
+                            rx_fsm_r <= write_ack_s;
                         end if;
-                        if (strobe_r = '1') then
-                            address_r <= std_logic_vector(unsigned(address_r) + bytes_per_transfer_c);
-                        end if;
-                        if (size_counter_r = to_unsigned(1, size_counter_r'length)) then
-                            if (udp_last_i = '1') then
+                    end if;
+
+                when write_ack_s =>
+                    if (ack_received_r = '1') then
+                        if (size_counter_r = to_unsigned(0, size_counter_r'length)) then
+                            if (last_store_r = '1') then
                                 rx_fsm_r <= idle_s;
                             else
+                                udp_ready_r <= '1';
                                 rx_fsm_r <= wait_for_end_s;
                             end if;
+                        else
+                            udp_ready_r <= '1';
+                            address_r <= std_logic_vector(unsigned(address_r) + bytes_per_transfer_c);
+                            rx_fsm_r <= write_s;
                         end if;
                     end if;
 
@@ -184,6 +196,7 @@ begin
                         address_r <= std_logic_vector(unsigned(address_r) + bytes_per_transfer_c);
                         strobe_r <= '1';
                     end if;
+
                 when wait_for_end_s =>
                     if ((udp_valid_i = '1') and (udp_last_i = '1')) then
                         rx_fsm_r <= idle_s;
@@ -205,6 +218,17 @@ begin
             end if;
         end if;
     end process timeout_proc;
+
+    ack_proc : process (clk_i)
+    begin
+        if (rising_edge(clk_i)) then
+            if (udp_ready_r = '1') then
+                ack_received_r <= '0';
+            elsif (ack_i = '1') then
+                ack_received_r <= '1';
+            end if;
+        end if;
+    end process ack_proc;
 
     tx_proc : process (clk_i)
     begin

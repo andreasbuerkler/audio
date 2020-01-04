@@ -1,8 +1,8 @@
 --------------------------------------------------------------------------------
 -- Author    : Andreas Buerkler
--- Date      : 28.12.2018
--- Filename  : registerbank_tb.vhd
--- Changelog : 28.12.2018 - file created
+-- Date      : 03.01.2020
+-- Filename  : i2c_master_tb.vhd
+-- Changelog : 03.01.2020 - file created
 --------------------------------------------------------------------------------
 
 library ieee;
@@ -12,10 +12,10 @@ use ieee.numeric_std.all;
 library work;
 use work.fpga_pkg.all;
 
-entity registerbank_tb is
-end entity registerbank_tb;
+entity i2c_master_tb is
+end entity i2c_master_tb;
 
-architecture rtl of registerbank_tb is
+architecture rtl of i2c_master_tb is
 
     component eth_ctrl is
     generic (
@@ -43,46 +43,60 @@ architecture rtl of registerbank_tb is
         ack_i       : in  std_logic);
     end component eth_ctrl;
 
-    component registerbank is
+    component i2c_master is
     generic (
-        register_count_g : positive;
-        register_init_g  : std_logic_array_32;
-        register_mask_g  : std_logic_array_32;
-        read_only_g      : std_logic_vector;
-        data_width_g     : positive;
-        address_width_g  : positive);
+        freq_in_g       : positive;
+        freq_out_g      : positive);
     port (
-        clk_i          : in  std_logic;
-        reset_i        : in  std_logic;
-        -- register
-        data_i         : in  std_logic_array_32(register_count_g-1 downto 0);
-        data_strb_i    : in  std_logic_vector(register_count_g-1 downto 0);
-        data_o         : out std_logic_array_32(register_count_g-1 downto 0);
-        data_strb_o    : out std_logic_vector(register_count_g-1 downto 0);
+        clk_i   : in  std_logic;
+        reset_i : in  std_logic;
+        scl_o   : out std_logic;
+        sda_i   : in  std_logic;
+        sda_o   : out std_logic;
         -- ctrl bus
-        ctrl_address_i : in  std_logic_vector(address_width_g-1 downto 0);
-        ctrl_data_i    : in  std_logic_vector(data_width_g-1 downto 0);
-        ctrl_data_o    : out std_logic_vector(data_width_g-1 downto 0);
-        ctrl_strobe_i  : in  std_logic;
-        ctrl_write_i   : in  std_logic;
-        ctrl_ack_o     : out std_logic);
-    end component registerbank;
+        address_i   : in  std_logic_vector(9 downto 0);
+        data_i      : in  std_logic_vector(31 downto 0);
+        data_o      : out std_logic_vector(31 downto 0);
+        strobe_i    : in  std_logic;
+        write_i     : in  std_logic;
+        ack_o       : out std_logic);
+    end component i2c_master;
+
+    component i2c_slave is
+    generic (
+        I2C_ADDRESS : std_logic_vector(7 downto 0));
+    port (
+        clk_i        : in  std_logic;
+        scl_i        : in  std_logic;
+        sda_i        : in  std_logic;
+        sda_o        : out std_logic;
+        address_o    : out std_logic_vector(7 downto 0);
+        wr_o         : out std_logic;
+        rd_o         : out std_logic;
+        rd_valid_i   : in  std_logic;
+        rd_data_i    : in  std_logic_vector(7 downto 0);
+        wr_data_o    : out std_logic_vector(7 downto 0));
+    end component i2c_slave;
+
+    component ram is
+    generic (
+        addr_width_g   : positive;
+        data_width_g   : positive);
+    port (
+        clk_i     : in  std_logic;
+        -- write port
+        wr_data_i : in  std_logic_vector(data_width_g-1 downto 0);
+        wr_i      : in  std_logic;
+        wr_addr_i : in  std_logic_vector(addr_width_g-1 downto 0);
+        -- read port
+        rd_data_o : out std_logic_vector(data_width_g-1 downto 0);
+        rd_i      : in  std_logic;
+        rd_addr_i : in  std_logic_vector(addr_width_g-1 downto 0));
+    end component ram;
 
     constant address_width_c  : positive := 16;
     constant data_width_c     : positive := 32;
-    constant register_count_c : positive := 8;
-    constant read_only_c      : std_logic_vector(register_count_c-1 downto 0) := (others => '0');
-    constant register_init_c  : std_logic_array_32(register_count_c-1 downto 0) :=
-                               (x"00000000",
-                                x"00000001",
-                                x"00000002",
-                                x"00000003",
-                                x"00000004",
-                                x"00000005",
-                                x"00000006",
-                                x"00000007");
-
-    constant register_mask_c : std_logic_array_32(register_count_c-1 downto 0) := (others => (others => '1'));
+    constant i2c_slave_addr_c : std_logic_vector(7 downto 0) := x"34";
 
     constant command_read_c          : std_logic_vector(7 downto 0) := x"01";
     constant command_write_c         : std_logic_vector(7 downto 0) := x"02";
@@ -93,14 +107,22 @@ architecture rtl of registerbank_tb is
     signal clk_en : boolean := true;
 
     signal ctrl_address : std_logic_vector(address_width_c-1 downto 0);
-    signal ctrl_data_r  : std_logic_vector(data_width_c-1 downto 0);
+    signal ctrl_data_r  : std_logic_vector(data_width_c-1 downto 0) := (others => '0');
     signal ctrl_data_w  : std_logic_vector(data_width_c-1 downto 0);
     signal ctrl_strobe  : std_logic;
     signal ctrl_write   : std_logic;
     signal ctrl_ack     : std_logic;
 
-    signal register_read_data_r : std_logic_array_32(register_count_c-1 downto 0) := (others => (others => '0'));
-    signal register_read_strb_r : std_logic_vector(register_count_c-1 downto 0) := (others => '0');
+    signal scl_ms : std_logic;
+    signal sda_ms : std_logic;
+    signal sda_sm : std_logic;
+
+    signal i2c_slave_address  : std_logic_vector(7 downto 0);
+    signal i2c_slave_wr       : std_logic;
+    signal i2c_slave_rd       : std_logic;
+    signal i2c_slave_rd_valid : std_logic;
+    signal i2c_slave_rd_data  : std_logic_vector(7 downto 0);
+    signal i2c_slave_wr_data  : std_logic_vector(7 downto 0);
 
     signal udp_rx_valid_r : std_logic := '0';
     signal udp_rx_ready   : std_logic;
@@ -120,9 +142,9 @@ begin
     begin
         if (clk_en) then
             clk <= '0';
-            wait for 20 ns;
+            wait for 10 ns;
             clk <= '1';
-            wait for 20 ns;
+            wait for 10 ns;
         end if;
     end process clkgen_proc;
 
@@ -151,29 +173,60 @@ begin
         write_o     => ctrl_write,
         ack_i       => ctrl_ack);
 
-    i_registerbank : registerbank
+    i_i2c_master : i2c_master
     generic map (
-        register_count_g => 8,
-        register_init_g  => register_init_c,
-        register_mask_g  => register_mask_c,
-        read_only_g      => read_only_c,
-        data_width_g     => data_width_c,
-        address_width_g  => address_width_c-2)
+        freq_in_g       => 50000000,
+        freq_out_g      => 100000)
     port map (
-        clk_i          => clk,
-        reset_i        => '0',
-        -- register
-        data_i         => register_read_data_r,
-        data_strb_i    => register_read_strb_r,
-        data_o         => open,
-        data_strb_o    => open,
+        clk_i   => clk,
+        reset_i => '0',
+        scl_o   => scl_ms,
+        sda_i   => sda_sm,
+        sda_o   => sda_ms,
         -- ctrl bus
-        ctrl_address_i => ctrl_address(address_width_c-1 downto 2),
-        ctrl_data_i    => ctrl_data_w,
-        ctrl_data_o    => ctrl_data_r,
-        ctrl_strobe_i  => ctrl_strobe,
-        ctrl_write_i   => ctrl_write,
-        ctrl_ack_o     => ctrl_ack);
+        address_i   => ctrl_address(9 downto 0),
+        data_i      => ctrl_data_w,
+        data_o      => ctrl_data_r,
+        strobe_i    => ctrl_strobe,
+        write_i     => ctrl_write,
+        ack_o       => ctrl_ack);
+
+    i_i2c_slave : i2c_slave
+    generic map (
+        I2C_ADDRESS => i2c_slave_addr_c)
+    port map (
+        clk_i        => clk,
+        scl_i        => scl_ms,
+        sda_i        => sda_ms,
+        sda_o        => sda_sm,
+        address_o    => i2c_slave_address,
+        wr_o         => i2c_slave_wr,
+        rd_o         => i2c_slave_rd,
+        rd_valid_i   => i2c_slave_rd_valid,
+        rd_data_i    => i2c_slave_rd_data,
+        wr_data_o    => i2c_slave_wr_data);
+
+    i_i2c_slave_ram : ram
+    generic map (
+        addr_width_g   => i2c_slave_address'length,
+        data_width_g   => i2c_slave_wr_data'length)
+    port map (
+        clk_i     => clk,
+        -- write port
+        wr_data_i => i2c_slave_wr_data,
+        wr_i      => i2c_slave_wr,
+        wr_addr_i => i2c_slave_address,
+        -- read port
+        rd_data_o => i2c_slave_rd_data,
+        rd_i      => i2c_slave_rd,
+        rd_addr_i => i2c_slave_address);
+
+    i2c_slave_ram_read_ack_proc : process (clk)
+    begin
+        if (rising_edge(clk)) then
+            i2c_slave_rd_valid <= i2c_slave_rd;
+        end if;
+    end process i2c_slave_ram_read_ack_proc;
 
     ctrl_proc : process
         procedure ctrl_wait_for_signal (signal ready : in  std_logic) is
@@ -302,66 +355,73 @@ begin
     begin
         wait for 200 ns;
         wait until rising_edge(clk);
-        -- read init values
-        for i in 0 to register_count_c-1 loop
-            address_v := std_logic_vector(to_unsigned(i*4, address_v'length));
-            ctrl_read(udp_rx_valid_r, udp_rx_data_r, udp_rx_last_r, udp_rx_ready, address_v, x"04");
-            ctrl_wait_for_read_data (udp_tx_valid, udp_tx_data, udp_tx_last, read_data_v);
-            assert (read_data_v = register_init_c(i)) report "read error" severity error;
-            debug_data <= read_data_v;
-        end loop;
-        -- overwrite all registers
-        for i in 0 to register_count_c-1 loop
-            address_v := std_logic_vector(to_unsigned(i*4, address_v'length));
-            write_data_v := std_logic_vector(to_unsigned(i*20, write_data_v'length));
-            ctrl_write(udp_rx_valid_r, udp_rx_data_r, udp_rx_last_r, udp_rx_ready, address_v, write_data_v, x"04");
-        end loop;
-        -- read overwritten values
-        for i in 0 to register_count_c-1 loop
-            address_v := std_logic_vector(to_unsigned(i*4, address_v'length));
-            ctrl_read(udp_rx_valid_r, udp_rx_data_r, udp_rx_last_r, udp_rx_ready, address_v, x"04");
-            ctrl_wait_for_read_data (udp_tx_valid, udp_tx_data, udp_tx_last, read_data_v);
-            assert (read_data_v = std_logic_vector(to_unsigned(i*20, write_data_v'length))) report "read error" severity error;
-            debug_data <= read_data_v;
-        end loop;
-        -- test read timeout
-        address_v := std_logic_vector(to_unsigned(register_count_c*4, address_v'length));
-        ctrl_read(udp_rx_valid_r, udp_rx_data_r, udp_rx_last_r, udp_rx_ready, address_v, x"04");
-        ctrl_wait_for_read_data (udp_tx_valid, udp_tx_data, udp_tx_last, read_data_v);
-        debug_data <= read_data_v;
-        -- write 0x12345678 to adress 0x8
-        address_v := x"0008";
-        write_data_v := x"12345678";
-        ctrl_write(udp_rx_valid_r, udp_rx_data_r, udp_rx_last_r, udp_rx_ready, address_v, write_data_v, x"04");
-        -- write 0xaabbccdd to adress 0xC
-        address_v := x"000C";
-        write_data_v := x"aabbccdd";
+
+        -- write 0x23 to adress 0x01
+        address_v := x"01" & i2c_slave_addr_c;
+        write_data_v := x"01_230000";
         ctrl_write(udp_rx_valid_r, udp_rx_data_r, udp_rx_last_r, udp_rx_ready, address_v, write_data_v, x"04");
         wait until rising_edge(clk);
-        -- read address 0x8
-        address_v := x"0008";
+
+        -- read address 0x1
+        address_v := x"00" & i2c_slave_addr_c;
+        write_data_v := x"01_000000";
+        ctrl_write(udp_rx_valid_r, udp_rx_data_r, udp_rx_last_r, udp_rx_ready, address_v, write_data_v, x"04");
+        wait until rising_edge(clk);
+        address_v := x"00" & i2c_slave_addr_c;
         ctrl_read(udp_rx_valid_r, udp_rx_data_r, udp_rx_last_r, udp_rx_ready, address_v, x"04");
         ctrl_wait_for_read_data (udp_tx_valid, udp_tx_data, udp_tx_last, read_data_v);
         debug_data <= read_data_v;
-        assert (read_data_v = x"12345678") report "read error" severity error;
-        -- read address 0xC
-        address_v := x"000C";
+        assert (read_data_v = x"00000023") report "read error" severity error;
+        wait until rising_edge(clk);
+
+        -- write 0xAABB to adress 0x02 (write 2 bytes)
+        address_v := x"02" & i2c_slave_addr_c;
+        write_data_v := x"02_AABB00";
+        ctrl_write(udp_rx_valid_r, udp_rx_data_r, udp_rx_last_r, udp_rx_ready, address_v, write_data_v, x"04");
+        wait until rising_edge(clk);
+
+        -- read address 0x2 (read 2 bytes)
+        address_v := x"00" & i2c_slave_addr_c;
+        write_data_v := x"02_000000";
+        ctrl_write(udp_rx_valid_r, udp_rx_data_r, udp_rx_last_r, udp_rx_ready, address_v, write_data_v, x"04");
+        wait until rising_edge(clk);
+        address_v := x"01" & i2c_slave_addr_c;
         ctrl_read(udp_rx_valid_r, udp_rx_data_r, udp_rx_last_r, udp_rx_ready, address_v, x"04");
         ctrl_wait_for_read_data (udp_tx_valid, udp_tx_data, udp_tx_last, read_data_v);
         debug_data <= read_data_v;
-        assert (read_data_v = x"aabbccdd") report "read error" severity error;
-        -- consecutive read of 8 words
-        address_v := x"0000";
-        ctrl_read(udp_rx_valid_r, udp_rx_data_r, udp_rx_last_r, udp_rx_ready, address_v, x"20");
+        assert (read_data_v = x"0000AABB") report "read error" severity error;
+        wait until rising_edge(clk);
+
+        -- write 0x123456 to adress 0x04 (write 3 bytes)
+        address_v := x"03" & i2c_slave_addr_c;
+        write_data_v := x"04_123456";
+        ctrl_write(udp_rx_valid_r, udp_rx_data_r, udp_rx_last_r, udp_rx_ready, address_v, write_data_v, x"04");
+        wait until rising_edge(clk);
+
+        -- read address 0x4 (read 3 bytes)
+        address_v := x"00" & i2c_slave_addr_c;
+        write_data_v := x"04_000000";
+        ctrl_write(udp_rx_valid_r, udp_rx_data_r, udp_rx_last_r, udp_rx_ready, address_v, write_data_v, x"04");
+        wait until rising_edge(clk);
+        address_v := x"02" & i2c_slave_addr_c;
+        ctrl_read(udp_rx_valid_r, udp_rx_data_r, udp_rx_last_r, udp_rx_ready, address_v, x"04");
         ctrl_wait_for_read_data (udp_tx_valid, udp_tx_data, udp_tx_last, read_data_v);
-        -- consecutive write of 8 words
-        address_v := x"0000";
-        write_data_v := x"aabbccdd";
-        ctrl_write(udp_rx_valid_r, udp_rx_data_r, udp_rx_last_r, udp_rx_ready, address_v, write_data_v, x"20");
-        -- consecutive read with timeout
-        address_v := x"0004";
-        ctrl_read(udp_rx_valid_r, udp_rx_data_r, udp_rx_last_r, udp_rx_ready, address_v, x"20");
+        debug_data <= read_data_v;
+        assert (read_data_v = x"00123456") report "read error" severity error;
+        wait until rising_edge(clk);
+
+        -- read address 0x1 (read 4 bytes)
+        address_v := x"00" & i2c_slave_addr_c;
+        write_data_v := x"01_000000";
+        ctrl_write(udp_rx_valid_r, udp_rx_data_r, udp_rx_last_r, udp_rx_ready, address_v, write_data_v, x"04");
+        wait until rising_edge(clk);
+        address_v := x"03" & i2c_slave_addr_c;
+        ctrl_read(udp_rx_valid_r, udp_rx_data_r, udp_rx_last_r, udp_rx_ready, address_v, x"04");
         ctrl_wait_for_read_data (udp_tx_valid, udp_tx_data, udp_tx_last, read_data_v);
+        debug_data <= read_data_v;
+        assert (read_data_v = x"23AABB12") report "read error" severity error;
+        wait until rising_edge(clk);
+
         for i in 0 to 9 loop
             wait until rising_edge(clk);
         end loop;

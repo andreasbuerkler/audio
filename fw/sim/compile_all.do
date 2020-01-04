@@ -39,6 +39,7 @@ if { $::argc != 1 } {
     # i2c
     vcom ../source/i2c_config.vhd -check_synthesis
     vcom ../source/i2c_slave.vhd -check_synthesis
+    vcom ../source/i2c_master.vhd -check_synthesis
 
     # audio
     vcom ../source/i2s_inout.vhd -check_synthesis
@@ -56,6 +57,7 @@ if { $::argc != 1 } {
     vcom ../testbench/crc32_tb.vhd
     vcom ../testbench/fifo_tb.vhd
     vcom ../testbench/i2c_config_tb.vhd
+    vcom ../testbench/i2c_master_tb.vhd
     vcom ../testbench/i2c_slave_tb.vhd
     vcom ../testbench/i2s_inout_tb.vhd
     vcom ../testbench/rmii_interface_tb.vhd
