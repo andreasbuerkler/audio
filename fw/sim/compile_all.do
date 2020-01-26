@@ -13,6 +13,7 @@ if { $::argc != 1 } {
     vcom ../source/dual_clock_ram.vhd -check_synthesis
     vcom ../source/registerbank.vhd -check_synthesis
     vcom ../source/clock_converter.vhd -check_synthesis
+    vcom ../source/interconnect.vhd -check_synthesis
 
     # eth mac
     vcom ../source/rmii_interface.vhd -check_synthesis
@@ -50,6 +51,9 @@ if { $::argc != 1 } {
     vcom ../source/convolution.vhd -check_synthesis
     vcom ../source/sinus_gen.vhd -check_synthesis
 
+    # debug
+    vcom ../source/mdio_debug.vhd -check_synthesis
+
     # top level
     vcom ../source/audio_top.vhd -check_synthesis
 
@@ -68,6 +72,8 @@ if { $::argc != 1 } {
     vcom ../testbench/crossfader_tb.vhd
     vcom ../testbench/convolution_tb.vhd
     vcom ../testbench/sinus_gen_tb.vhd
+    vcom ../testbench/interconnect_tb.vhd
+    vcom ../testbench/mdio_debug_tb.vhd
 
     # start simulation
     set tbName $1
