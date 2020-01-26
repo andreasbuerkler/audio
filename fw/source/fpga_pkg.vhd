@@ -10,6 +10,11 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
 package fpga_pkg is
+
+    type std_logic_array_24 is array (natural range <>) of std_logic_vector(23 downto 0);
+    type std_logic_array_32 is array (natural range <>) of std_logic_vector(31 downto 0);
+    type std_logic_array    is array (natural range <>, natural range <>) of std_logic;
+
     function log2ceil (n : natural) return natural;
     function reverse (n : std_logic_vector) return std_logic_vector;
     function vector_or (n : std_logic_vector) return std_logic;
@@ -17,10 +22,7 @@ package fpga_pkg is
     function checksum_add (n, u : std_logic_vector) return std_logic_vector;
     function resize_left_aligned (n : unsigned; u : positive) return unsigned;
     function resize_left_aligned (n : signed; u : positive) return signed;
-
-    type std_logic_array_24 is array (natural range <>) of std_logic_vector(23 downto 0);
-    type std_logic_array_32 is array (natural range <>) of std_logic_vector(31 downto 0);
-    type std_logic_array    is array (natural range <>, natural range <>) of std_logic;
+    function array_extract(index : natural; in_array : std_logic_array) return std_logic_vector;
 
 end fpga_pkg;
 
@@ -105,5 +107,14 @@ package body fpga_pkg is
         end if;
         return retval;
     end resize_left_aligned;
+
+    function array_extract(index : natural; in_array : std_logic_array) return std_logic_vector is
+        variable out_vector_v : std_logic_vector(in_array'range(2));
+    begin
+        for i in out_vector_v'range loop
+            out_vector_v(i) := in_array(index, i);
+        end loop;
+        return out_vector_v;
+    end function array_extract;
 
 end fpga_pkg;
