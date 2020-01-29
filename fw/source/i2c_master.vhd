@@ -178,8 +178,10 @@ begin
                     end if;
 
                 when error_s =>
+                    scl_r <= '1';
                     error_r <= '1';
                     ctrl_ack_r <= '1';
+                    fsm_r <= idle_s;
 
                 when data_write_s =>
                     if (clock_state_r = "00") then
