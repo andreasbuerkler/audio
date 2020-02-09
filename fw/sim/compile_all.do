@@ -9,6 +9,7 @@ if { $::argc != 1 } {
     # common
     vcom ../source/fpga_pkg.vhd -check_synthesis
     vcom ../source/fifo.vhd -check_synthesis
+    vcom ../source/fifo_dual_clock.vhd -check_synthesis
     vcom ../source/ram.vhd -check_synthesis
     vcom ../source/dual_clock_ram.vhd -check_synthesis
     vcom ../source/registerbank.vhd -check_synthesis
@@ -51,6 +52,9 @@ if { $::argc != 1 } {
     vcom ../source/convolution.vhd -check_synthesis
     vcom ../source/sinus_gen.vhd -check_synthesis
 
+    # video
+    vcom ../source/lcd_controller.vhd -check_synthesis
+
     # debug
     vcom ../source/mdio_debug.vhd -check_synthesis
 
@@ -60,6 +64,7 @@ if { $::argc != 1 } {
     # test benches
     vcom ../testbench/crc32_tb.vhd
     vcom ../testbench/fifo_tb.vhd
+    vcom ../testbench/fifo_dual_clock_tb.vhd
     vcom ../testbench/i2c_config_tb.vhd
     vcom ../testbench/i2c_master_tb.vhd
     vcom ../testbench/i2c_slave_tb.vhd
@@ -74,6 +79,7 @@ if { $::argc != 1 } {
     vcom ../testbench/sinus_gen_tb.vhd
     vcom ../testbench/interconnect_tb.vhd
     vcom ../testbench/mdio_debug_tb.vhd
+    vcom ../testbench/lcd_controller_tb.vhd
 
     # start simulation
     set tbName $1

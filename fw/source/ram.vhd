@@ -33,7 +33,7 @@ architecture rtl of ram is
     signal rd_data_r : std_logic_vector(data_width_g-1 downto 0) := (others => '0');
 
     attribute ramstyle : string;
-    attribute ramstyle of mem_r : signal is "M9K";
+    attribute ramstyle of mem_r : signal is "M10K";
 
 begin
 

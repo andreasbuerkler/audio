@@ -23,6 +23,8 @@ package fpga_pkg is
     function resize_left_aligned (n : unsigned; u : positive) return unsigned;
     function resize_left_aligned (n : signed; u : positive) return signed;
     function array_extract(index : natural; in_array : std_logic_array) return std_logic_vector;
+    function bin_to_gray (b : unsigned) return unsigned;
+    function gray_to_bin (b : unsigned) return unsigned;
 
 end fpga_pkg;
 
@@ -116,5 +118,31 @@ package body fpga_pkg is
         end loop;
         return out_vector_v;
     end function array_extract;
+
+    function bin_to_gray (b : unsigned) return unsigned is
+        variable retval : unsigned(b'range);
+    begin
+        for i in b'high downto b'low loop
+            if (i = b'high) then
+                retval(i) := b(i);
+            else
+                retval(i) := b(i) xor b(i+1);
+            end if;
+        end loop;
+        return retval;
+    end bin_to_gray;
+
+    function gray_to_bin (b : unsigned) return unsigned is
+        variable retval : unsigned(b'range);
+    begin
+        for i in b'high downto b'low loop
+            if (i = b'high) then
+                retval(i) := b(i);
+            else
+                retval(i) := b(i) xor retval(i+1);
+            end if;
+        end loop;
+        return retval;
+    end gray_to_bin;
 
 end fpga_pkg;

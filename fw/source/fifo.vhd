@@ -55,7 +55,7 @@ architecture rtl of fifo is
     signal reject_delay_r           : std_logic := '0';
 
     attribute ramstyle : string;
-    attribute ramstyle of mem_r : signal is "M9K";
+    attribute ramstyle of mem_r : signal is "M10K";
 
 begin
 

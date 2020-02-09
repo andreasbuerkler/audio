@@ -57,7 +57,7 @@ begin
     end generate forward_gen;
 
     -- address decode
-    address_decode_proc : process (master_strobe_i, master_write_i, master_address_i, master_data_i)
+    address_decode_proc : process (master_strobe_i, master_write_i, master_address_i)
         variable strobe_v : std_logic_vector(address_map_g'length-1 downto 0);
         variable write_v  : std_logic_vector(address_map_g'length-1 downto 0);
     begin
