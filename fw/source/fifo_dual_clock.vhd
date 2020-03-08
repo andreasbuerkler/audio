@@ -3,6 +3,7 @@
 -- Date      : 03.02.2020
 -- Filename  : fifo_dual_clock.vhd
 -- Changelog : 03.02.2020 - file created
+--           : 08.03.2020 - almost full added
 --------------------------------------------------------------------------------
 
 library ieee;
@@ -16,19 +17,21 @@ entity fifo_dual_clock is
 generic (
     size_exp_g     : positive := 10;
     data_width_g   : positive := 8;
+    almost_full_g  : positive := 2**10-1;
     invert_full_g  : boolean  := false;
     invert_empty_g : boolean  := false);
 port (
     -- write port
-    clk_w_i  : in  std_logic;
-    data_i   : in  std_logic_vector(data_width_g-1 downto 0);
-    wr_i     : in  std_logic;
-    full_o   : out std_logic;
+    clk_w_i       : in  std_logic;
+    data_i        : in  std_logic_vector(data_width_g-1 downto 0);
+    wr_i          : in  std_logic;
+    full_o        : out std_logic;
+    almost_full_o : out std_logic;
     -- read port
-    clk_r_i  : in  std_logic;
-    data_o   : out std_logic_vector(data_width_g-1 downto 0);
-    rd_i     : in  std_logic;
-    empty_o  : out std_logic);
+    clk_r_i       : in  std_logic;
+    data_o        : out std_logic_vector(data_width_g-1 downto 0);
+    rd_i          : in  std_logic;
+    empty_o       : out std_logic);
 end entity fifo_dual_clock;
 
 architecture rtl of fifo_dual_clock is
@@ -53,6 +56,7 @@ architecture rtl of fifo_dual_clock is
 
     signal wr_addr_r                : std_logic_vector(size_exp_g-1 downto 0) := (others => '0');
     signal full_r                   : std_logic := '0';
+    signal almost_full_r            : std_logic := '0';
     signal word_counter_w_r         : unsigned(size_exp_g downto 0) := (others => '0');
     signal word_counter_wr_r        : unsigned(size_exp_g downto 0) := (others => '0');
 
@@ -119,6 +123,13 @@ begin
             else
                 full_r <= '0';
             end if;
+
+            if (used_words_v >= to_unsigned(almost_full_g, used_words_v'length)) then
+                almost_full_r <= '1';
+            else
+                almost_full_r <= '0';
+            end if;
+
         end if;
     end process counter_w_proc;
 
@@ -179,5 +190,6 @@ begin
     end generate normal_empty_gen;
 
     data_o <= rd_data_r;
+    almost_full_o <= almost_full_r;
 
 end rtl;
