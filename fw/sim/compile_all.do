@@ -5,6 +5,7 @@ if { $::argc != 1 } {
     vdel -all
 
     vlib work
+    vlib fmf
 
     # common
     vcom ../source/fpga_pkg.vhd -check_synthesis
@@ -55,11 +56,19 @@ if { $::argc != 1 } {
     # video
     vcom ../source/lcd_controller.vhd -check_synthesis
 
+    # ram controller
+    vcom ../source/hyper_ram_controller.vhd -check_synthesis
+
     # debug
     vcom ../source/mdio_debug.vhd -check_synthesis
 
     # top level
     vcom ../source/audio_top.vhd -check_synthesis
+
+    # hyper ram functional model
+    vcom -work fmf ../testbench/s27kl0641/utilities/gen_utils.vhd
+    vcom -work fmf ../testbench/s27kl0641/utilities/conversions.vhd
+    vcom ../testbench/s27kl0641/model/s27kl0641.vhd
 
     # test benches
     vcom ../testbench/crc32_tb.vhd
@@ -80,6 +89,7 @@ if { $::argc != 1 } {
     vcom ../testbench/interconnect_tb.vhd
     vcom ../testbench/mdio_debug_tb.vhd
     vcom ../testbench/lcd_controller_tb.vhd
+    vcom ../testbench/hyper_ram_controller_tb.vhd
 
     # start simulation
     set tbName $1
