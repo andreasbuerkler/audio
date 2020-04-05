@@ -238,6 +238,22 @@ architecture rtl of audio_top is
         wr_en_i        : in  std_logic);
     end component convolution;
 
+    component sinus_gen is
+    generic (
+        data_width_g : natural);
+    port (
+        audio_clk_i    : in  std_logic;
+        register_clk_i : in  std_logic;
+        -- audio in
+        request_i      : in  std_logic;
+        -- audio out
+        valid_o        : out std_logic;
+        data_o         : out std_logic_vector(data_width_g-1 downto 0);
+        -- control
+        increment_i    : in  std_logic_vector(31 downto 0);
+        change_i       : in  std_logic);
+    end component sinus_gen;
+
     constant ctrl_address_width_c : positive := 16;
     constant ctrl_data_width_c    : positive := 32;
 
@@ -255,30 +271,42 @@ architecture rtl of audio_top is
                                                    x"06_10" &
                                                    x"07_02";
 
-    constant register_count_c              : positive := 16;
-    constant register_address_version_c    : natural  := 0;
-    constant register_address_in_meter_r_c : natural  := 1;
-    constant register_address_in_meter_l_c : natural  := 2;
-    constant register_address_in_fader_r_c : natural  := 3;
-    constant register_address_in_fader_l_c : natural  := 4;
+    constant register_count_c                : positive := 16;
+    constant register_address_version_c      : natural  := 0;
+    constant register_address_in_meter_r_c   : natural  := 1;
+    constant register_address_in_meter_l_c   : natural  := 2;
+    constant register_address_in_fader_r_c   : natural  := 3;
+    constant register_address_in_fader_l_c   : natural  := 4;
+    constant register_address_out_meter_r_c  : natural  := 5;
+    constant register_address_out_meter_l_c  : natural  := 6;
+    constant register_address_conv_fader_r_c : natural  := 7;
+    constant register_address_conv_fader_l_c : natural  := 8;
 
     constant register_init_c      : std_logic_array_32(register_count_c-1 downto 0) :=
                                    (register_address_version_c    => x"BEEF0123",
                                     others => x"00000000");
     constant register_read_only_c : std_logic_vector(register_count_c-1 downto 0) :=
-                                   (register_address_version_c    => '1',
-                                    register_address_in_meter_r_c => '1',
-                                    register_address_in_meter_l_c => '1',
-                                    register_address_in_fader_r_c => '0',
-                                    register_address_in_fader_l_c => '0',
-                                    others                        => '0');
+                                   (register_address_version_c      => '1',
+                                    register_address_in_meter_r_c   => '1',
+                                    register_address_in_meter_l_c   => '1',
+                                    register_address_in_fader_r_c   => '0',
+                                    register_address_in_fader_l_c   => '0',
+                                    register_address_out_meter_r_c  => '1',
+                                    register_address_out_meter_l_c  => '1',
+                                    register_address_conv_fader_r_c => '0',
+                                    register_address_conv_fader_l_c => '0',
+                                    others                          => '0');
     constant register_mask_c      : std_logic_array_32(register_count_c-1 downto 0) :=
-                                   (register_address_version_c    => x"ffffffff",
-                                    register_address_in_meter_r_c => x"000000ff",
-                                    register_address_in_meter_l_c => x"000000ff",
-                                    register_address_in_fader_r_c => x"000000ff",
-                                    register_address_in_fader_l_c => x"000000ff",
-                                    others                        => x"ffffffff");
+                                   (register_address_version_c      => x"ffffffff",
+                                    register_address_in_meter_r_c   => x"000000ff",
+                                    register_address_in_meter_l_c   => x"000000ff",
+                                    register_address_in_fader_r_c   => x"000000ff",
+                                    register_address_in_fader_l_c   => x"000000ff",
+                                    register_address_out_meter_r_c  => x"000000ff",
+                                    register_address_out_meter_l_c  => x"000000ff",
+                                    register_address_conv_fader_r_c => x"000000ff",
+                                    register_address_conv_fader_l_c => x"000000ff",
+                                    others                          => x"ffffffff");
 
     -- clocks
     signal clk49_152 : std_logic;
@@ -355,6 +383,16 @@ architecture rtl of audio_top is
     signal fast_conv_r_valid : std_logic;
     signal fast_conv_data    : std_logic_vector(23 downto 0);
 
+    -- convolution bypass fader
+    signal conv_fader_l_valid : std_logic;
+    signal conv_fader_r_valid : std_logic;
+    signal conv_fader_data    : std_logic_vector(23 downto 0);
+
+    -- output meter
+    signal out_meter_r_level : std_logic_vector(7 downto 0);
+    signal out_meter_l_level : std_logic_vector(7 downto 0);
+    signal out_meter_strobe  : std_logic;
+
 begin
 
     i_pll : audio_pll
@@ -422,6 +460,21 @@ begin
         left_valid_i  => conv_l_valid,
         data_i        => conv_data);
 
+    i_input_meter : meter
+    generic map (
+        data_width_g => 24)
+    port map (
+        audio_clk_i    => clk12_288_i,
+        left_valid_i   => audio_l_valid,
+        right_valid_i  => audio_r_valid,
+        data_i         => audio_data,
+        register_clk_i => clk50_000_i,
+        data_read_l_i  => register_was_read(register_address_in_meter_l_c),
+        data_read_r_i  => register_was_read(register_address_in_meter_r_c),
+        level_l_o      => in_meter_l_level,
+        level_r_o      => in_meter_r_level,
+        level_strobe_o => in_meter_strobe);
+
     i_input_fader : crossfader
     generic map (
         data_width_g => 24)
@@ -478,19 +531,72 @@ begin
         coeff_i        => x"00000000",
         wr_en_i        => '0');
 
+    i_conv_bypass : crossfader
+    generic map (
+        data_width_g => 24)
+    port map (
+        audio_clk_i       => clk49_152,
+        register_clk_i    => clk50_000_i,
+        -- audio in
+        m_left_valid_i    => fast_conv_l_valid,
+        m_right_valid_i   => fast_conv_r_valid,
+        m_data_i          => fast_conv_data,
+        s_left_valid_i    => fast_fader_l_valid,
+        s_right_valid_i   => fast_fader_r_valid,
+        s_data_i          => fast_fader_data,
+        -- audio out
+        left_valid_o      => conv_fader_l_valid,
+        right_valid_o     => conv_fader_r_valid,
+        data_o            => conv_fader_data,
+        -- control
+        m_level_valid_l_i => register_write_strb(register_address_conv_fader_l_c),
+        m_level_valid_r_i => register_write_strb(register_address_conv_fader_r_c),
+        m_level_l_i       => register_write_data(register_address_conv_fader_l_c)(7 downto 0),
+        m_level_r_i       => register_write_data(register_address_conv_fader_r_c)(7 downto 0));
+
     i_cc_49to12 : clock_converter
     generic map (
         data_width_g => 24,
         channels_g   => 2)
     port map (
         in_clk_i   => clk49_152,
-        valid_i(0) => fast_conv_l_valid,
-        valid_i(1) => fast_conv_r_valid,
-        data_i     => fast_conv_data,
+        valid_i(0) => conv_fader_l_valid,
+        valid_i(1) => conv_fader_r_valid,
+        data_i     => conv_fader_data,
         out_clk_i  => clk12_288_i,
         valid_o(0) => conv_l_valid,
         valid_o(1) => conv_r_valid,
         data_o     => conv_data);
+
+    i_sin : sinus_gen
+    generic map (
+        data_width_g => 24)
+    port map (
+        audio_clk_i    => clk12_288_i,
+        register_clk_i => clk50_000_i,
+        -- audio in
+        request_i      => conv_fader_l_valid,
+        -- audio out
+        valid_o        => open,
+        data_o         => open,
+        -- control
+        increment_i    => x"00000000",
+        change_i       => '0');
+
+    i_output_meter : meter
+    generic map (
+        data_width_g => 24)
+    port map (
+        audio_clk_i    => clk12_288_i,
+        left_valid_i   => conv_l_valid,
+        right_valid_i  => conv_r_valid,
+        data_i         => conv_data,
+        register_clk_i => clk50_000_i,
+        data_read_l_i  => register_was_read(register_address_out_meter_l_c),
+        data_read_r_i  => register_was_read(register_address_out_meter_r_c),
+        level_l_o      => out_meter_l_level,
+        level_r_o      => out_meter_r_level,
+        level_strobe_o => out_meter_strobe);
 
     i_mac : eth_mac
     generic map (
@@ -573,21 +679,10 @@ begin
     register_read_data(register_address_in_meter_l_c)(in_meter_l_level'range) <= in_meter_l_level;
     register_read_strb(register_address_in_meter_r_c) <= in_meter_strobe;
     register_read_strb(register_address_in_meter_l_c) <= in_meter_strobe;
-
-    i_input_meter : meter
-    generic map (
-        data_width_g => 24)
-    port map (
-        audio_clk_i    => clk12_288_i,
-        left_valid_i   => audio_l_valid,
-        right_valid_i  => audio_r_valid,
-        data_i         => audio_data,
-        register_clk_i => clk50_000_i,
-        data_read_l_i  => register_was_read(register_address_in_meter_l_c),
-        data_read_r_i  => register_was_read(register_address_in_meter_r_c),
-        level_l_o      => in_meter_l_level,
-        level_r_o      => in_meter_r_level,
-        level_strobe_o => in_meter_strobe);
+    register_read_data(register_address_out_meter_r_c)(out_meter_r_level'range) <= out_meter_r_level;
+    register_read_data(register_address_out_meter_l_c)(out_meter_l_level'range) <= out_meter_l_level;
+    register_read_strb(register_address_out_meter_r_c) <= out_meter_strobe;
+    register_read_strb(register_address_out_meter_l_c) <= out_meter_strobe;
 
     -- output signals
     led_n_o      <= led_n_r;
