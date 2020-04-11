@@ -26,6 +26,7 @@ generic (
     column_address_width_g : positive := 9);
 port (
     clk_i             : in    std_logic;
+    clk_shifted_i     : in    std_logic;
     reset_i           : in    std_logic;
     -- hyper bus
     hyper_rst_n_o     : out   std_logic;
@@ -46,9 +47,9 @@ end entity hyper_ram_controller;
 architecture rtl of hyper_ram_controller is
 
     constant power_up_wait_cycles_c : positive := 200000/clock_period_ns_g;
-    constant ca_read_sel_c  : natural := 47;
-    constant ca_space_sel_c : natural := 46;
-    constant ca_burst_sel_c : natural := 45;
+    constant ca_read_sel_c          : natural := 47;
+    constant ca_space_sel_c         : natural := 46;
+    constant ca_burst_sel_c         : natural := 45;
     subtype  ca_upper_address_range_c is natural range 44 downto 16;
     subtype  ca_lower_address_range_c is natural range 2 downto 0;
 
@@ -60,7 +61,7 @@ architecture rtl of hyper_ram_controller is
     signal data_r              : std_logic_vector(data_width_g-1 downto 0) := (others => '0');
     signal data_ack_r          : std_logic := '0';
     signal data_halfword_sel_r : std_logic := '0';
-    signal burst_counter_r     : unsigned(ctrl_burst_size_i'range) := (others => '0');
+    signal burst_counter_r     : unsigned(log2ceil(max_burst_size_g)-1 downto 0) := (others => '0');
     signal ca_r                : std_logic_vector(47 downto 0) := (others => '0');
     signal ca_counter_r        : unsigned(1 downto 0) := (others => '0');
     signal latency_counter_r   : unsigned(log2ceil(latency_cycles_g)-1 downto 0) := to_unsigned(latency_cycles_g-2, log2ceil(latency_cycles_g));
@@ -77,12 +78,19 @@ architecture rtl of hyper_ram_controller is
 
     signal hyper_data_en_r       : std_logic := '0';
     signal hyper_data_en_delay_r : std_logic := '0';
+    signal hyper_data_in         : std_logic_vector(15 downto 0);
     signal hyper_data_in_r       : std_logic_vector(15 downto 0) := (others => '0');
+    signal hyper_data_in_upper_r : std_logic_vector(7 downto 0) := (others => '0');
     signal hyper_data_out_r      : std_logic_vector(15 downto 0) := (others => '0');
 
     signal hyper_rwds_en_r       : std_logic := '0';
     signal hyper_rwds_en_delay_r : std_logic := '0';
-    signal hyper_rwds_in_r       : std_logic_vector(1 downto 0) := (others => '0');
+
+    signal hyper_data_in_counter_r       : unsigned(log2ceil(2*max_burst_size_g) downto 0) := (others => '0');
+    signal hyper_data_in_counter_cc_r    : unsigned(log2ceil(2*max_burst_size_g) downto 0) := (others => '0');
+    signal hyper_data_in_counter_delay_r : unsigned(log2ceil(2*max_burst_size_g) downto 0) := (others => '0');
+    signal hyper_data_in_counter_low_r   : std_logic := '0';
+    signal hyper_data_in_counter_reset_r : std_logic := '0';
 
 begin
 
@@ -110,6 +118,7 @@ begin
     begin
         if (rising_edge(clk_i)) then
             data_ack_r <= '0';
+            hyper_data_in_counter_reset_r <= '0';
             case (fsm_r) is
                 when idle_s =>
                     in_progress_r <= '0';
@@ -127,6 +136,7 @@ begin
                     end if;
 
                 when start_s =>
+                    hyper_data_in_counter_reset_r <= '1';
                     ca_r(ca_read_sel_c) <= read_request_r;
                     ca_r(ca_space_sel_c) <= '0'; -- access to memory space
                     ca_r(ca_burst_sel_c) <= '1'; -- linear burst
@@ -170,12 +180,8 @@ begin
                             -- go directly to write without latency for register access
                             fsm_r <= write_s;
                         else
-                            if (ca_r(ca_read_sel_c) = '0') then
-                                -- add additional latency for memory write
-                                fsm_r <= wait_s;
-                            else
-                                fsm_r <= read_s;
-                            end if;
+                            -- add additional latency
+                            fsm_r <= wait_s;
                         end if;
                     end if;
 
@@ -183,29 +189,28 @@ begin
                     hyper_data_en_r <= '0';
                     -- wait until initial latency has passed
                     if (vector_or(std_logic_vector(latency_counter_r)) = '0') then
-                        data_ack_r <= '1';
-                        fsm_r <= write_s;
+                        if (ca_r(ca_read_sel_c) = '0') then
+                            data_ack_r <= '1';
+                            fsm_r <= write_s;
+                        else
+                            fsm_r <= read_s;
+                        end if;
                     else
                         latency_counter_r <= latency_counter_r - 1;
                     end if;
 
                 when read_s =>
                     hyper_data_en_r <= '0';
-                    if ((hyper_rwds_in_r(0) xor hyper_rwds_in_r(1)) = '1') then
-                        data_halfword_sel_r <= not data_halfword_sel_r;
-                        if (data_halfword_sel_r = '1') then
-                            data_ack_r <= '1';
-                            data_r(31 downto 16) <= hyper_data_in_r;
-                            if (vector_or(std_logic_vector(burst_counter_r)) = '0') then
-                                hyper_cs_en_r <= '0';
-                                hyper_clk_en_r <= '0';
-                                fsm_r <= idle_s;
-                            else
-                                burst_counter_r <= burst_counter_r - 1;
-                            end if;
-                        else
-                            data_r(15 downto 0) <= hyper_data_in_r;
+                    if ((hyper_data_in_counter_delay_r(0) = '0') and (hyper_data_in_counter_low_r = '1')) then
+                        data_ack_r <= '1';
+                        data_r(31 downto 16) <= hyper_data_in_r;             
+                        if (hyper_data_in_counter_delay_r(hyper_data_in_counter_delay_r'high downto 1) = (unsigned(burst_size_r)+1)) then
+                            hyper_cs_en_r <= '0';
+                            hyper_clk_en_r <= '0';
+                            fsm_r <= idle_s;
                         end if;
+                    else
+                        data_r(15 downto 0) <= hyper_data_in_r;
                     end if;
 
                 when write_s =>
@@ -252,8 +257,24 @@ begin
             hyper_data_en_delay_r <= hyper_data_en_r;
             hyper_cs_en_n_delay_r <= not hyper_cs_en_r;
             hyper_rwds_en_delay_r <= hyper_rwds_en_r;
+
+            -- input data reordering
+            hyper_data_in_upper_r <= hyper_data_in(7 downto 0);
+            hyper_data_in_r <= hyper_data_in(15 downto 8) & hyper_data_in_upper_r;
+            hyper_data_in_counter_cc_r <= hyper_data_in_counter_r;
+            hyper_data_in_counter_delay_r <= hyper_data_in_counter_cc_r;
+            hyper_data_in_counter_low_r <= hyper_data_in_counter_delay_r(0);
         end if;
     end process delay_proc;
+
+    data_in_proc : process (hyper_rwds_io, hyper_data_in_counter_reset_r)
+    begin
+        if (hyper_data_in_counter_reset_r = '1') then
+            hyper_data_in_counter_r <= (others => '0');
+        elsif (rising_edge(hyper_rwds_io)) then
+            hyper_data_in_counter_r <= hyper_data_in_counter_r + 1;
+        end if;
+    end process data_in_proc;
 
     i_ddr_data_reg : altddio_bidir
     generic map (
@@ -269,33 +290,14 @@ begin
     port map (
         datain_h   => hyper_data_out_r(15 downto 8),
         datain_l   => hyper_data_out_r(7 downto 0),
-        inclock    => clk_i,
+        inclock    => hyper_rwds_io,
         outclock   => clk_i,
-        dataout_h  => hyper_data_in_r(15 downto 8),
-        dataout_l  => hyper_data_in_r(7 downto 0),
+        dataout_h  => hyper_data_in(7 downto 0),
+        dataout_l  => hyper_data_in(15 downto 8),
         padio      => hyper_data_io,
         oe         => hyper_data_en_delay_r);
 
-    i_ddr_rwds_reg : altddio_bidir
-    generic map (
-        extend_oe_disable        => "OFF",
-        implement_input_in_lcell => "OFF",
-        intended_device_family   => "Cyclone V",
-        invert_output            => "OFF",
-        lpm_hint                 => "UNUSED",
-        lpm_type                 => "altddio_bidir",
-        oe_reg                   => "UNREGISTERED",
-        power_up_high            => "OFF",
-        width                    => 1)
-    port map (
-        datain_h(0)  => '0',
-        datain_l(0)  => '0',
-        inclock      => clk_i,
-        outclock     => clk_i,
-        dataout_h(0) => hyper_rwds_in_r(1),
-        dataout_l(0) => hyper_rwds_in_r(0),
-        padio(0)     => hyper_rwds_io,
-        oe           => hyper_rwds_en_delay_r);
+    hyper_rwds_io <= '0' when (hyper_rwds_en_delay_r = '1') else 'Z';
 
     i_ddr_clk_reg : altddio_out
     generic map (
@@ -310,7 +312,7 @@ begin
     port map (
         datain_h(0) => hyper_clk_en_r,
         datain_l(0) => '0',
-        outclock    => clk_i,
+        outclock    => clk_shifted_i,
         dataout(0)  => hyper_clk_o);
 
     hyper_cs_n_o <= hyper_cs_en_n_delay_r;
