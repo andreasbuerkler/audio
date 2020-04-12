@@ -61,10 +61,10 @@ set_false_path -rise_from [get_clocks ram_return_clk] -rise_to [get_clocks ram_r
 set_false_path -fall_from [get_clocks ram_return_clk] -fall_to [get_clocks ram_return_clk] -setup
 
 # False paths for output data
-set_false_path -rise_from [get_clocks ${main_pll_clk}] -fall_to [get_clocks ram_clk] -hold
-set_false_path -fall_from [get_clocks ${main_pll_clk}] -rise_to [get_clocks ram_clk] -hold
-set_false_path -rise_from [get_clocks ${main_pll_clk}] -rise_to [get_clocks ram_clk] -setup
-set_false_path -fall_from [get_clocks ${main_pll_clk}] -fall_to [get_clocks ram_clk] -setup
+set_false_path -rise_from [get_clocks ${main_pll_clk}] -fall_to [get_clocks ram_clk] -setup
+set_false_path -fall_from [get_clocks ${main_pll_clk}] -rise_to [get_clocks ram_clk] -setup
+set_false_path -rise_from [get_clocks ${main_pll_clk}] -rise_to [get_clocks ram_clk] -hold
+set_false_path -fall_from [get_clocks ${main_pll_clk}] -fall_to [get_clocks ram_clk] -hold
 
 # false path for asynchronous reset
 set_false_path -from [get_registers {hyper_ram_controller:i_hyper_ram|hyper_data_in_counter_reset_r}]

@@ -61,7 +61,6 @@ set_global_assignment -name IOBANK_VCCIO 3.3V -section_id 3A
 set_global_assignment -name IOBANK_VCCIO 3.3V -section_id 2A
 set_global_assignment -name IOBANK_VCCIO 3.3V -section_id 7A
 set_global_assignment -name IOBANK_VCCIO 3.3V -section_id 8A
-set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to ram_rwds_o
 set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to clk50_000_i
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to eth_mdc_o
 set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to eth_mdio_io
@@ -153,7 +152,6 @@ set_location_assignment PIN_T10 -to ram_d5_io
 set_location_assignment PIN_R11 -to ram_d6_io
 set_location_assignment PIN_R12 -to ram_d7_io
 set_location_assignment PIN_T15 -to ram_rst_n_o
-set_location_assignment PIN_R10 -to ram_rwds_o
 set_location_assignment PIN_A4 -to i2c_scl_o
 set_location_assignment PIN_A3 -to i2c_sda_io
 set_location_assignment PIN_F8 -to clk50_000_i
@@ -171,9 +169,38 @@ set_global_assignment -name OUTPUT_IO_TIMING_NEAR_END_VMEAS "HALF VCCIO" -fall
 set_global_assignment -name OUTPUT_IO_TIMING_FAR_END_VMEAS "HALF SIGNAL SWING" -rise
 set_global_assignment -name OUTPUT_IO_TIMING_FAR_END_VMEAS "HALF SIGNAL SWING" -fall
 set_global_assignment -name ACTIVE_SERIAL_CLOCK FREQ_100MHZ
-set_global_assignment -name ENABLE_SIGNALTAP OFF
-set_global_assignment -name USE_SIGNALTAP_FILE stp1.stp
 set_global_assignment -name ENABLE_INIT_DONE_OUTPUT ON
+set_location_assignment PIN_R10 -to ram_rwds_io
+set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to ram_rwds_io
+set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to ram_d0_io
+set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to ram_d1_io
+set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to ram_d2_io
+set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to ram_d3_io
+set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to ram_d4_io
+set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to ram_d5_io
+set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to ram_d6_io
+set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to ram_d7_io
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to ram_rwds_io
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to ram_cs_n_o
+set_instance_assignment -name D5_DELAY 0 -to ram_d0_io
+set_instance_assignment -name D5_DELAY 0 -to ram_d1_io
+set_instance_assignment -name D5_DELAY 0 -to ram_d2_io
+set_instance_assignment -name D5_DELAY 0 -to ram_d3_io
+set_instance_assignment -name D5_DELAY 0 -to ram_d4_io
+set_instance_assignment -name D5_DELAY 0 -to ram_d5_io
+set_instance_assignment -name D5_DELAY 0 -to ram_d6_io
+set_instance_assignment -name D5_DELAY 0 -to ram_d7_io
+set_instance_assignment -name D5_DELAY 0 -to ram_rwds_io
+set_instance_assignment -name D5_DELAY 0 -to ram_clk_o
+set_instance_assignment -name D5_DELAY 0 -to ram_cs_n_o
+set_instance_assignment -name D3_DELAY 0 -to ram_d0_io
+set_instance_assignment -name D3_DELAY 0 -to ram_d1_io
+set_instance_assignment -name D3_DELAY 0 -to ram_d2_io
+set_instance_assignment -name D3_DELAY 0 -to ram_d3_io
+set_instance_assignment -name D3_DELAY 0 -to ram_d4_io
+set_instance_assignment -name D3_DELAY 0 -to ram_d5_io
+set_instance_assignment -name D3_DELAY 0 -to ram_d6_io
+set_global_assignment -name VHDL_FILE ../source/main_pll.vhd
 set_global_assignment -name VHDL_FILE ../source/i2c_master.vhd
 set_global_assignment -name VHDL_FILE ../source/interconnect.vhd
 set_global_assignment -name VHDL_FILE ../source/mdio_debug.vhd

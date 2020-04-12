@@ -32,6 +32,7 @@ architecture rtl of hyper_ram_controller_tb is
         column_address_width_g : positive);
     port (
         clk_i             : in    std_logic;
+        clk_shifted_i     : in    std_logic;
         reset_i           : in    std_logic;
         -- hyper bus
         hyper_rst_n_o     : out   std_logic;
@@ -107,16 +108,16 @@ architecture rtl of hyper_ram_controller_tb is
         RWDS     : inout std_logic);
     end component s27kl0641;
 
-    signal clk     : std_logic;
-    signal clk_en  : boolean := true;
-    signal reset   : std_logic := '1';
-    signal reset_n : std_logic;
+    signal clk         : std_logic;
+    signal clk_shifted : std_logic;
+    signal clk_en      : boolean := true;
+    signal reset       : std_logic := '1';
+    signal reset_n     : std_logic;
 
     signal hyper_data      : std_logic_vector(7 downto 0);
     signal hyper_rwds      : std_logic;
     signal hyper_cs_n      : std_logic;
     signal hyper_clk       : std_logic;
-    signal hyper_clk_delay : std_logic;
     signal hyper_reset_n   : std_logic;
 
     signal ctrl_address    : std_logic_vector(21 downto 0) := (others => '0');
@@ -138,6 +139,8 @@ begin
             wait for 10 ns;
         end if;
     end process clk_proc;
+
+    clk_shifted <= transport clk after 5 ns;
 
     reset_proc : process
     begin
@@ -215,8 +218,6 @@ begin
         wait;
     end process control_proc;
 
-    hyper_clk_delay <= transport hyper_clk after 5 ns;
-
     i_dut : hyper_ram_controller
     generic map (
         clock_period_ns_g      => 20,
@@ -228,6 +229,7 @@ begin
         column_address_width_g => 9)
     port map (
         clk_i             => clk,
+        clk_shifted_i     => clk_shifted,
         reset_i           => reset,
         -- hyper bus
         hyper_rst_n_o     => hyper_reset_n,
@@ -259,9 +261,9 @@ begin
         tipd_RESETNeg                      => VitalZeroDelay01,
         tipd_RWDS                          => VitalZeroDelay01,
         tpd_CSNeg_RWDS                     => UnitDelay01Z,
-        tpd_CK_RWDS                        => UnitDelay01Z,
+        tpd_CK_RWDS                        => (others => 6.0 ns),
         tpd_CSNeg_DQ0                      => UnitDelay01Z,
-        tpd_CK_DQ0                         => UnitDelay01Z,
+        tpd_CK_DQ0                         => (others => 5.2 ns),
         tsetup_CSNeg_CK                    => UnitDelay,
         tsetup_DQ0_CK                      => UnitDelay,
         thold_CSNeg_CK                     => UnitDelay,
@@ -297,7 +299,7 @@ begin
         DQ1      => hyper_data(1),
         DQ0      => hyper_data(0),
         CSNeg    => hyper_cs_n,
-        CK       => hyper_clk_delay,
+        CK       => hyper_clk,
         RESETNeg => hyper_reset_n,
         RWDS     => hyper_rwds);
 

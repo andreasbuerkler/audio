@@ -42,7 +42,7 @@ port (
     ram_rst_n_o  : out   std_logic;
     ram_cs_n_o   : out   std_logic;
     ram_clk_o    : out   std_logic;
-    ram_rwds_o   : inout std_logic;
+    ram_rwds_io  : inout std_logic;
     ram_d0_io    : inout std_logic;
     ram_d1_io    : inout std_logic;
     ram_d2_io    : inout std_logic;
@@ -77,6 +77,15 @@ port (
 end entity lcd_top;
 
 architecture rtl of lcd_top is
+
+    component main_pll is
+    port (
+        rst_i    : in  std_logic;
+        clk_i    : in  std_logic;
+        clk_o    : out std_logic;
+        clk_90_o : out std_logic;
+        locked_o : out std_logic);
+    end component main_pll;
 
     component eth_mac is
     generic (
@@ -210,6 +219,7 @@ architecture rtl of lcd_top is
         column_address_width_g : positive);
     port (
         clk_i             : in    std_logic;
+        clk_shifted_i     : in    std_logic;
         reset_i           : in    std_logic;
         -- hyper bus
         hyper_rst_n_o     : out   std_logic;
@@ -305,19 +315,30 @@ architecture rtl of lcd_top is
     signal register_write_data : std_logic_array_32(register_count_c-1 downto 0) := (others => (others => '0'));
     signal register_write_strb : std_logic_vector(register_count_c-1 downto 0);
 
-    signal led_vec_r   : unsigned(24 downto 0) := (others => '0');
-    signal reset_vec_r : unsigned(24 downto 0) := (others => '0');
-    signal reset       : std_logic;
-    signal reset_n     : std_logic;
+    signal led_vec_r          : unsigned(24 downto 0) := (others => '0');
+    signal reset_vec_r        : unsigned(24 downto 0) := (others => '0');
+    signal reset              : std_logic;
+    signal reset_n            : std_logic;
+    signal clk_pll_50         : std_logic;
+    signal clk_pll_50_shifted : std_logic;
+    signal main_pll_locked    : std_logic;
 
 begin
+
+    i_main_pll : main_pll
+    port map (
+        rst_i    => '0',
+        clk_i    => clk50_000_i,
+        clk_o    => clk_pll_50,
+        clk_90_o => clk_pll_50_shifted,
+        locked_o => main_pll_locked);
 
     i_mac : eth_mac
     generic map (
         fifo_size_exp_g => 11)
     port map (
-        clk_i        => clk50_000_i,
-        reset_i      => '0',
+        clk_i        => clk_pll_50,
+        reset_i      => reset,
         -- tx
         data_valid_i => mac_tx_valid,
         data_ready_o => mac_tx_ready,
@@ -343,8 +364,8 @@ begin
         ctrl_address_width_g => ctrl_address_width_c,
         ctrl_data_width_g    => ctrl_data_width_c)
     port map (
-        clk_i          => clk50_000_i,
-        reset_i        => '0',
+        clk_i          => clk_pll_50,
+        reset_i        => reset,
         -- mac rx
         mac_valid_i    => mac_rx_valid,
         mac_ready_o    => mac_rx_ready,
@@ -369,8 +390,8 @@ begin
         master_data_width_g    => ctrl_data_width_c,
         master_address_width_g => ctrl_address_width_c)
     port map (
-        clk_i            => clk50_000_i,
-        reset_i          => '0',
+        clk_i            => clk_pll_50,
+        reset_i          => reset,
         -- master
         master_address_i => ctrl_address,
         master_data_i    => ctrl_data_out,
@@ -407,8 +428,8 @@ begin
         data_width_g     => ctrl_data_width_c,
         address_width_g  => ctrl_address_width_c-6)
     port map (
-        clk_i          => clk50_000_i,
-        reset_i        => '0',
+        clk_i          => clk_pll_50,
+        reset_i        => reset,
         -- register
         data_i         => register_read_data,
         data_strb_i    => register_read_strb,
@@ -428,8 +449,8 @@ begin
         freq_in_g  => main_clock_frequency_c,
         freq_out_g => i2c_clock_frequency_c)
     port map (
-        clk_i     => clk50_000_i,
-        reset_i   => '0',
+        clk_i     => clk_pll_50,
+        reset_i   => reset,
         scl_o     => i2c_scl,
         sda_i     => i2c_sda_io,
         sda_o     => i2c_sda,
@@ -451,13 +472,14 @@ begin
         row_address_width_g    => 13,
         column_address_width_g => 9)
     port map (
-        clk_i             => clk50_000_i,
+        clk_i             => clk_pll_50,
+        clk_shifted_i     => clk_pll_50_shifted,
         reset_i           => reset,
         -- hyper bus
         hyper_rst_n_o     => ram_rst_n_o,
         hyper_cs_n_o      => ram_cs_n_o,
         hyper_clk_o       => ram_clk_o,
-        hyper_rwds_io     => ram_rwds_o,
+        hyper_rwds_io     => ram_rwds_io,
         hyper_data_io(0)  => ram_d0_io,
         hyper_data_io(1)  => ram_d1_io,
         hyper_data_io(2)  => ram_d2_io,
@@ -479,9 +501,11 @@ begin
     register_read_data(register_address_test_c) <= x"12345678";
     register_read_strb(register_address_test_c) <= '0';
 
-    reset_proc : process (clk50_000_i)
+    reset_proc : process (clk_pll_50, main_pll_locked)
     begin
-        if (rising_edge(clk50_000_i)) then
+        if (main_pll_locked = '0') then
+            reset_vec_r <= (others => '0');
+        elsif (rising_edge(clk_pll_50)) then
             if (reset_vec_r(reset_vec_r'high) = '0') then
                 reset_vec_r <= reset_vec_r + 1;
             end if;
@@ -492,9 +516,9 @@ begin
     reset_n <= reset_vec_r(reset_vec_r'high);
 
     -- output signals
-    led_proc : process (clk50_000_i)
+    led_proc : process (clk_pll_50)
     begin
-        if (rising_edge(clk50_000_i)) then
+        if (rising_edge(clk_pll_50)) then
             led_vec_r <= led_vec_r + 1;
         end if;
     end process;
@@ -504,7 +528,7 @@ begin
     led2_n_o     <= led_vec_r(led_vec_r'high-2);
 
     eth_rst_n_o  <= reset_n;
-    eth_refclk_o <= clk50_000_i;
+    eth_refclk_o <= clk_pll_50;
     eth_tx_en_o  <= tx_en;
     eth_tx_d0_o  <= tx_d(0);
     eth_tx_d1_o  <= tx_d(1);

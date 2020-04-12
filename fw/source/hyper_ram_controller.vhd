@@ -59,6 +59,8 @@ architecture rtl of hyper_ram_controller is
     signal init_done_r         : std_logic := '0';
     signal init_counter_r      : unsigned(log2ceil(power_up_wait_cycles_c+1)-1 downto 0) := to_unsigned(power_up_wait_cycles_c, log2ceil(power_up_wait_cycles_c+1));
     signal data_r              : std_logic_vector(data_width_g-1 downto 0) := (others => '0');
+    signal data_read_r         : std_logic_vector(data_width_g-1 downto 0) := (others => '0');
+    signal data_read_cc_r      : std_logic_vector(data_width_g-1 downto 0) := (others => '0');
     signal data_ack_r          : std_logic := '0';
     signal data_halfword_sel_r : std_logic := '0';
     signal burst_counter_r     : unsigned(log2ceil(max_burst_size_g)-1 downto 0) := (others => '0');
@@ -73,13 +75,13 @@ architecture rtl of hyper_ram_controller is
     signal in_progress_r       : std_logic := '0';
 
     signal hyper_clk_en_r        : std_logic := '0';
+    signal hyper_clk_en_delay_r  : std_logic := '0';
     signal hyper_cs_en_r         : std_logic := '0';
-    signal hyper_cs_en_n_delay_r : std_logic := '0';
+    signal hyper_cs_en_delay_r   : std_logic := '0';
 
     signal hyper_data_en_r       : std_logic := '0';
     signal hyper_data_en_delay_r : std_logic := '0';
     signal hyper_data_in         : std_logic_vector(15 downto 0);
-    signal hyper_data_in_r       : std_logic_vector(15 downto 0) := (others => '0');
     signal hyper_data_in_upper_r : std_logic_vector(7 downto 0) := (others => '0');
     signal hyper_data_out_r      : std_logic_vector(15 downto 0) := (others => '0');
 
@@ -148,7 +150,7 @@ begin
                     end if;
                     ca_counter_r <= (others => '0');
                     fsm_r <= address_s;
-                
+
                 when init_s =>
                     ca_r(ca_read_sel_c) <= '0';
                     ca_r(ca_space_sel_c) <= '1'; -- access to register space
@@ -201,16 +203,13 @@ begin
 
                 when read_s =>
                     hyper_data_en_r <= '0';
-                    if ((hyper_data_in_counter_delay_r(0) = '0') and (hyper_data_in_counter_low_r = '1')) then
+                    if (hyper_data_in_counter_low_r = '1') and (hyper_data_in_counter_delay_r(0) = '0') then
                         data_ack_r <= '1';
-                        data_r(31 downto 16) <= hyper_data_in_r;             
-                        if (hyper_data_in_counter_delay_r(hyper_data_in_counter_delay_r'high downto 1) = (unsigned(burst_size_r)+1)) then
-                            hyper_cs_en_r <= '0';
-                            hyper_clk_en_r <= '0';
-                            fsm_r <= idle_s;
-                        end if;
-                    else
-                        data_r(15 downto 0) <= hyper_data_in_r;
+                    end if;
+                    if (hyper_data_in_counter_delay_r(hyper_data_in_counter_delay_r'high downto 1) = (unsigned(burst_size_r)+1)) then
+                        hyper_cs_en_r <= '0';
+                        hyper_clk_en_r <= '0';
+                        fsm_r <= idle_s;
                     end if;
 
                 when write_s =>
@@ -230,7 +229,6 @@ begin
                         fsm_r <= idle_s;
                     else
                         if (vector_or(std_logic_vector(burst_counter_r)) = '0') then
-                            in_progress_r <= '0';
                             if (data_halfword_sel_r = '1') then
                                 fsm_r <= idle_s;
                             end if;
@@ -251,30 +249,41 @@ begin
         end if;
     end process fsm_proc;
 
-    delay_proc : process(clk_i)
+    delay_proc : process (clk_i)
     begin
         if (rising_edge(clk_i)) then
+            hyper_clk_en_delay_r <= hyper_clk_en_r;
+            hyper_cs_en_delay_r <= hyper_cs_en_r;
             hyper_data_en_delay_r <= hyper_data_en_r;
-            hyper_cs_en_n_delay_r <= not hyper_cs_en_r;
             hyper_rwds_en_delay_r <= hyper_rwds_en_r;
+            data_read_cc_r <= data_read_r;
+        end if;
+    end process delay_proc;
 
-            -- input data reordering
+    data_read_proc : process (clk_i)
+    begin
+        if (falling_edge(clk_i)) then
+            -- input data reordering on falling edge to improve timing
             hyper_data_in_upper_r <= hyper_data_in(7 downto 0);
-            hyper_data_in_r <= hyper_data_in(15 downto 8) & hyper_data_in_upper_r;
+            if (hyper_data_in_counter_cc_r(0) = '0') and (hyper_data_in_counter_delay_r(0) = '1') then
+                data_read_r(31 downto 16) <= hyper_data_in(15 downto 8) & hyper_data_in_upper_r;
+            elsif (hyper_data_in_counter_cc_r(0) = '1') and (hyper_data_in_counter_delay_r(0) = '0') then
+                data_read_r(15 downto 0) <= hyper_data_in(15 downto 8) & hyper_data_in_upper_r;
+            end if;
             hyper_data_in_counter_cc_r <= hyper_data_in_counter_r;
             hyper_data_in_counter_delay_r <= hyper_data_in_counter_cc_r;
             hyper_data_in_counter_low_r <= hyper_data_in_counter_delay_r(0);
         end if;
-    end process delay_proc;
+    end process data_read_proc;
 
-    data_in_proc : process (hyper_rwds_io, hyper_data_in_counter_reset_r)
+    data_in_counter_proc : process (hyper_rwds_io, hyper_data_in_counter_reset_r)
     begin
         if (hyper_data_in_counter_reset_r = '1') then
             hyper_data_in_counter_r <= (others => '0');
         elsif (rising_edge(hyper_rwds_io)) then
             hyper_data_in_counter_r <= hyper_data_in_counter_r + 1;
         end if;
-    end process data_in_proc;
+    end process data_in_counter_proc;
 
     i_ddr_data_reg : altddio_bidir
     generic map (
@@ -310,16 +319,16 @@ begin
         power_up_high          => "OFF",
         width                  => 1)
     port map (
-        datain_h(0) => hyper_clk_en_r,
+        datain_h(0) => hyper_clk_en_delay_r,
         datain_l(0) => '0',
         outclock    => clk_shifted_i,
         dataout(0)  => hyper_clk_o);
 
-    hyper_cs_n_o <= hyper_cs_en_n_delay_r;
+    hyper_cs_n_o <= not hyper_cs_en_delay_r;
 
     hyper_rst_n_o <= not reset_i;
 
-    ctrl_data_o <= data_r;
+    ctrl_data_o <= data_read_cc_r;
     ctrl_ack_o <= data_ack_r;
 
 end rtl;
