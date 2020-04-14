@@ -33,13 +33,12 @@ namespace Lcd
                 _packetId++;
                 if (success) {
                     return true;
-                } else {
-                    Console.WriteLine("Get read data failed: ErrorCode = " + errorCode);
                 }
+            } else {
+                errorCode = _ERROR_SEND;
             }
             _packetId++;
             data = 0x0;
-            errorCode = _ERROR_SEND;
             return false;
         }
 
@@ -90,32 +89,36 @@ namespace Lcd
             return true;
         }
 
-
         private bool GetRead32Data(out UInt32 data, out UInt32 errorCode, Byte packetId) {
+            data = 0x0;
             try {
                 int timeout = _TIMEOUT_MS;
                 while (timeout > 0) {
-                    if (_udpClient.Available > 0) {
+                    if (_udpClient.Available >= 7) {
                         Byte[] receiveBytes = _udpClient.Receive(ref _remoteIpEndPoint);
+                        if (receiveBytes[0] != packetId) {
+                            errorCode = _ERROR_PACKET_ID;
+                            return false;
+                        }
+                        if (receiveBytes[1] == _UDP_READ_TIMEOUT) {
+                            errorCode = _ERROR_READ_TIMEOUT;
+                            return false;
+                        }
                         if (receiveBytes[1] != _UDP_READ_RESPONSE) {
                             errorCode = _ERROR_TYPE;
-                            data = 0x0;
                             return false;
                         }
                         if (receiveBytes[2] != 4) { // length
                             errorCode = _ERROR_RECEIVED_LENGTH;
-                            data = 0x0;
                             return false;
                         }
                         if (receiveBytes.Length != 7) {
                             errorCode = _ERROR_PACKET_LENGTH;
-                            data = 0x0;
                             return false;
                         }
 
                         UInt32 receivedData = 0;
-                        for (int databyte = 3; databyte >= 0; databyte--)
-                        {
+                        for (int databyte = 3; databyte >= 0; databyte--) {
                             receivedData |= Convert.ToUInt32((int)(receiveBytes[databyte+3] << ((3-databyte)*8)) & 0xFFFFFFFF);
                         }
                         errorCode = _ERROR_SUCCESS;
@@ -126,13 +129,11 @@ namespace Lcd
                     timeout--;
                 }
                 errorCode = _ERROR_UDP_TIMEOUT;
-                data = 0x0;
                 return false;
             }
             catch (Exception e) {
                 Console.WriteLine(e.ToString());
                 errorCode = _ERROR_EXCEPTION;
-                data = 0x0;
                 return false;
             }
         }
@@ -144,7 +145,7 @@ namespace Lcd
         private const Byte _UDP_WRITE = 0x02;
         private const Byte _UDP_READ_RESPONSE = 0x04;
         private const Byte _UDP_READ_TIMEOUT = 0x08;
-        private const Byte _TIMEOUT_MS = 100;
+        private const int _TIMEOUT_MS = 100;
 
         public const UInt32 _ERROR_SUCCESS = 0x00;
         public const UInt32 _ERROR_UDP_TIMEOUT = 0x01;
@@ -152,6 +153,9 @@ namespace Lcd
         public const UInt32 _ERROR_RECEIVED_LENGTH = 0x03;
         public const UInt32 _ERROR_PACKET_LENGTH = 0x04;
         public const UInt32 _ERROR_SEND = 0x05;
-        public const UInt32 _ERROR_EXCEPTION = 0x06;
+        public const UInt32 _ERROR_RECEIVE = 0x06;
+        public const UInt32 _ERROR_EXCEPTION = 0x07;
+        public const UInt32 _ERROR_PACKET_ID = 0x08;
+        public const UInt32 _ERROR_READ_TIMEOUT = 0x09;
     }
 }

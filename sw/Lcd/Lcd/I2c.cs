@@ -6,10 +6,8 @@ namespace Lcd
 {
     public class I2c
     {
-        public I2c(string ipAddress, UInt16 udpPort) {
-            _ethInst = new Eth(ipAddress, udpPort);
-            _iPAddress = ipAddress;
-            _udpPort = udpPort;
+        public I2c(Eth ethInst) {
+            _ethInst = ethInst;
         }
 
         public bool Write16(Byte device, Byte address, UInt16 data) {
@@ -28,7 +26,7 @@ namespace Lcd
             status = _ethInst.Write32(memoryAddress, memoryData, out errorCode);
             if (!status)
             {
-                Console.WriteLine("Write address failed: ErrorCode = " + errorCode);
+                Console.WriteLine("Write address failed: ErrorCode = " + errorCode + " " + GetErrorString(errorCode));
                 return false;
             }
 
@@ -38,7 +36,7 @@ namespace Lcd
             status = _ethInst.Read32(memoryAddress, out errorBit, out errorCode);
             if (!status)
             {
-                Console.WriteLine("Read error failed: ErrorCode = " + errorCode);
+                Console.WriteLine("Read error failed: ErrorCode = " + errorCode + " " + GetErrorString(errorCode));
                 return false;
             }
             if (errorBit != 0x00000000)
@@ -64,7 +62,7 @@ namespace Lcd
             bool status;
             status = _ethInst.Write32(memoryAddress, memoryData, out errorCode);
             if (!status) {
-                Console.WriteLine("Write address failed: ErrorCode = " + errorCode);
+                Console.WriteLine("Write address failed: ErrorCode = " + errorCode + " " + GetErrorString(errorCode));
                 data = 0x00;
                 return false;
             }
@@ -73,7 +71,7 @@ namespace Lcd
             memoryAddress = ADDRESS_OFFSET | (UInt32)((size << 8) & 0xFF00) | (UInt32)(device & 0x7F);
             status = _ethInst.Read32(memoryAddress, out memoryData, out errorCode);
             if (!status) {
-                Console.WriteLine("Read data failed: ErrorCode = " + errorCode);
+                Console.WriteLine("Read data failed: ErrorCode = " + errorCode + " " + GetErrorString(errorCode));
                 data = 0x00;
                 return false;
             }
@@ -83,7 +81,7 @@ namespace Lcd
             UInt32 errorBit;
             status = _ethInst.Read32(memoryAddress, out errorBit, out errorCode);
             if (!status) {
-                Console.WriteLine("Read error failed: ErrorCode = " + errorCode);
+                Console.WriteLine("Read error failed: ErrorCode = " + errorCode + " " + GetErrorString(errorCode));
                 data = 0x00;
                 return false;
             }
@@ -97,9 +95,23 @@ namespace Lcd
             return true;
         }
 
-        private string _iPAddress;
-        private UInt16 _udpPort;
+        private string GetErrorString(UInt32 Error) {
+            switch (Error) {
+                case Eth._ERROR_SUCCESS:         return "success";
+                case Eth._ERROR_UDP_TIMEOUT:     return "udp timeout";
+                case Eth._ERROR_TYPE:            return "type";
+                case Eth._ERROR_RECEIVED_LENGTH: return "received length";
+                case Eth._ERROR_PACKET_LENGTH:   return "packet length";
+                case Eth._ERROR_SEND:            return "send";
+                case Eth._ERROR_RECEIVE:         return "receive";
+                case Eth._ERROR_EXCEPTION:       return "exception";
+                case Eth._ERROR_PACKET_ID:       return "wrong packet id";
+                case Eth._ERROR_READ_TIMEOUT:    return "read timeout";
+                default:                         return "unknown";
+            }
+        }
+
         private Eth _ethInst;
-        private const UInt32 ADDRESS_OFFSET = 0x00001000;
+        private const UInt32 ADDRESS_OFFSET = 0x00400000;
     }
 }
