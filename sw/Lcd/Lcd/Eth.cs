@@ -27,11 +27,13 @@ namespace Lcd
 
         public bool Read32(UInt32 address, out UInt32 data, out UInt32 errorCode)
         {
-            bool success = SendRead32Request(address, _packetId);
+            bool success = SendReadRequest(address, _packetId, 4);
+            List<UInt32> readData;
             if (success) {
-                success = GetRead32Data(out data, out errorCode, _packetId);
+                success = GetReadData(out readData, out errorCode, _packetId, 4);
                 _packetId++;
                 if (success) {
+                    data = readData[0];
                     return true;
                 }
             } else {
@@ -42,6 +44,27 @@ namespace Lcd
             return false;
         }
 
+        public bool Read(UInt32 address, out List<UInt32> data, out UInt32 errorCode, Byte NumberOfBytes)
+        {
+            bool success = SendReadRequest(address, _packetId, NumberOfBytes);
+            if (success)
+            {
+                success = GetReadData(out data, out errorCode, _packetId, NumberOfBytes);
+                _packetId++;
+                if (success)
+                {
+                    return true;
+                }
+            }
+            else
+            {
+                errorCode = _ERROR_SEND;
+            }
+            _packetId++;
+            data = new List<UInt32>();
+            return false;
+        }
+
         public bool Write32(UInt32 address, UInt32 data, out UInt32 errorCode) {
             try {
                 List<Byte> byteList = new List<Byte>();
@@ -49,14 +72,14 @@ namespace Lcd
                 _packetId++;
                 byteList.Add(_UDP_WRITE);
                 byteList.Add(0x04); // address length
-                for (int databyte = 3; databyte >= 0; databyte--)
+                for (int dataByte = 3; dataByte >= 0; dataByte--)
                 {
-                    byteList.Add(Convert.ToByte(((int)address >> (8 * databyte)) & 0xff));
+                    byteList.Add(Convert.ToByte(((int)address >> (8 * dataByte)) & 0xff));
                 }
                 byteList.Add(0x04); // data length
-                for (int databyte = 3; databyte >= 0; databyte--)
+                for (int dataByte = 3; dataByte >= 0; dataByte--)
                 {
-                    byteList.Add(Convert.ToByte(((int)data >> (8 * databyte)) & 0xff));
+                    byteList.Add(Convert.ToByte(((int)data >> (8 * dataByte)) & 0xff));
                 }
                 Byte[] sendBytes = byteList.ToArray();
                 _udpClient.Send(sendBytes, sendBytes.Length);
@@ -69,17 +92,49 @@ namespace Lcd
             return true;
         }
 
-        private bool SendRead32Request(UInt32 address, Byte packetId) {
+        public bool Write(UInt32 address, List<UInt32> data, out UInt32 errorCode, Byte NumberOfBytes)
+        {
+            try
+            {
+                List<Byte> byteList = new List<Byte>();
+                byteList.Add(_packetId);
+                _packetId++;
+                byteList.Add(_UDP_WRITE);
+                byteList.Add(0x04); // address length
+                for (int dataByte = 3; dataByte >= 0; dataByte--)
+                {
+                    byteList.Add(Convert.ToByte(((int)address >> (8 * dataByte)) & 0xff));
+                }
+                byteList.Add(NumberOfBytes); // data length
+                for (int dataWord = 0; dataWord < NumberOfBytes/4; dataWord++) {
+                    for (int dataByte = 3; dataByte >= 0; dataByte--) {
+                        byteList.Add(Convert.ToByte(((int)data[dataWord] >> (8 * dataByte)) & 0xff));
+                    }
+                }
+                Byte[] sendBytes = byteList.ToArray();
+                _udpClient.Send(sendBytes, sendBytes.Length);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.ToString());
+                errorCode = _ERROR_EXCEPTION;
+                return false;
+            }
+            errorCode = _ERROR_SUCCESS;
+            return true;
+        }
+
+        private bool SendReadRequest(UInt32 address, Byte packetId, Byte NumberOfBytes) {
             try {
                 List<Byte> byteList = new List<Byte>();
                 byteList.Add(packetId);
                 byteList.Add(_UDP_READ);
                 byteList.Add(0x04); // address length
-                for (int databyte = 3; databyte >= 0; databyte--)
+                for (int dataByte = 3; dataByte >= 0; dataByte--)
                 {
-                    byteList.Add(Convert.ToByte(((int)address >> (8 * databyte)) & 0xff));
+                    byteList.Add(Convert.ToByte(((int)address >> (8 * dataByte)) & 0xff));
                 }
-                byteList.Add(0x04); // data length
+                byteList.Add(NumberOfBytes); // data length
                 Byte[] sendBytes = byteList.ToArray();
                 _udpClient.Send(sendBytes, sendBytes.Length);
             } catch (Exception e) {
@@ -89,8 +144,8 @@ namespace Lcd
             return true;
         }
 
-        private bool GetRead32Data(out UInt32 data, out UInt32 errorCode, Byte packetId) {
-            data = 0x0;
+        private bool GetReadData(out List<UInt32> data, out UInt32 errorCode, Byte packetId, Byte NumberOfBytes) {
+            data = new List<UInt32>();
             try {
                 int timeout = _TIMEOUT_MS;
                 while (timeout > 0) {
@@ -108,21 +163,23 @@ namespace Lcd
                             errorCode = _ERROR_TYPE;
                             return false;
                         }
-                        if (receiveBytes[2] != 4) { // length
+                        if (receiveBytes[2] != NumberOfBytes) { // length
                             errorCode = _ERROR_RECEIVED_LENGTH;
                             return false;
                         }
-                        if (receiveBytes.Length != 7) {
+                        if (receiveBytes.Length != (3+ NumberOfBytes)) {
                             errorCode = _ERROR_PACKET_LENGTH;
                             return false;
                         }
 
-                        UInt32 receivedData = 0;
-                        for (int databyte = 3; databyte >= 0; databyte--) {
-                            receivedData |= Convert.ToUInt32((int)(receiveBytes[databyte+3] << ((3-databyte)*8)) & 0xFFFFFFFF);
+                        for (int dataword = 0; dataword < NumberOfBytes; dataword += 4) {
+                            UInt32 receivedData = 0;
+                            for (int databyte = 3; databyte >= 0; databyte--) {
+                                receivedData |= Convert.ToUInt32((int)(receiveBytes[dataword + databyte + 3] << ((3 - databyte) * 8)) & 0xFFFFFFFF);
+                            }
+                            data.Add(receivedData);
                         }
                         errorCode = _ERROR_SUCCESS;
-                        data = receivedData;
                         return true;
                     }
                     Thread.Sleep(1);
