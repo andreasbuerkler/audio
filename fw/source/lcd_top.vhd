@@ -18,9 +18,9 @@ port (
     clk50_000_i  : in    std_logic;
 
     --debug
-    led0_n_o     : out   std_logic;
-    led1_n_o     : out   std_logic;
-    led2_n_o     : out   std_logic;
+    led0_o       : out   std_logic;
+    led1_o       : out   std_logic;
+    led2_o       : out   std_logic;
 
     -- i2c
     i2c_scl_o    : out   std_logic;
@@ -253,22 +253,27 @@ architecture rtl of lcd_top is
     constant slave_hyper_ram_c    : natural := 2;
     constant address_map_c : std_logic_array := (slave_registerbank_c => "00----------------------",
                                                  slave_i2c_master_c   => "01----------------------",
-                                                 slave_hyper_ram_c    => "10----------------------");
+                                                 slave_hyper_ram_c    => "1-----------------------");
 
     constant register_count_c                : positive := 4;
     constant register_address_version_c      : natural  := 0;
     constant register_address_test_c         : natural  := 1;
+    constant register_address_reset_c        : natural  := 2;
 
     constant register_init_c      : std_logic_array_32(register_count_c-1 downto 0) :=
                                    (register_address_version_c    => x"BEEF0123",
+                                    register_address_test_c       => x"00000000",
+                                    register_address_reset_c      => x"00000000",
                                     others => x"00000000");
     constant register_read_only_c : std_logic_vector(register_count_c-1 downto 0) :=
                                    (register_address_version_c      => '1',
                                     register_address_test_c         => '0',
+                                    register_address_reset_c        => '0',
                                     others                          => '0');
     constant register_mask_c      : std_logic_array_32(register_count_c-1 downto 0) :=
                                    (register_address_version_c      => x"ffffffff",
                                     register_address_test_c         => x"000000ff",
+                                    register_address_reset_c        => x"00000003",
                                     others                          => x"ffffffff");
 
     -- eth
@@ -298,7 +303,7 @@ architecture rtl of lcd_top is
     signal ctrl_ack      : std_logic;
 
     -- ctrl interconnect
-    signal slave_address         : std_logic_array(number_of_slaves_c-1 downto 0, ctrl_address_width_c-3 downto 0);
+    signal slave_address         : std_logic_array(number_of_slaves_c-1 downto 0, ctrl_address_width_c-1 downto 0);
     signal slave_read_data       : std_logic_array(number_of_slaves_c-1 downto 0, ctrl_data_width_c-1 downto 0);
     signal slave_write_data      : std_logic_array(number_of_slaves_c-1 downto 0, ctrl_data_width_c-1 downto 0);
     signal slave_strobe          : std_logic_vector(number_of_slaves_c-1 downto 0);
@@ -316,7 +321,8 @@ architecture rtl of lcd_top is
     signal register_write_strb : std_logic_vector(register_count_c-1 downto 0);
 
     signal led_vec_r          : unsigned(24 downto 0) := (others => '0');
-    signal reset_vec_r        : unsigned(24 downto 0) := (others => '0');
+    signal reset_vec_r        : unsigned(26 downto 0) := (others => '0');
+    signal reset_eth_vec_r    : unsigned(24 downto 0) := (others => '1');
     signal reset              : std_logic;
     signal reset_n            : std_logic;
     signal clk_pll_50         : std_logic;
@@ -489,7 +495,7 @@ begin
         hyper_data_io(6)  => ram_d6_io,
         hyper_data_io(7)  => ram_d7_io,
         -- ctrl bus
-        ctrl_address_i => array_extract(slave_hyper_ram_c, slave_address)(21 downto 0),
+        ctrl_address_i => array_extract(slave_hyper_ram_c, slave_address)(22 downto 1),
         ctrl_data_i    => array_extract(slave_hyper_ram_c ,slave_write_data),
         ctrl_data_o    => hyper_ram_readdata,
         ctrl_burst_size_i => "00000",
@@ -503,11 +509,17 @@ begin
 
     reset_proc : process (clk_pll_50, main_pll_locked)
     begin
-        if (main_pll_locked = '0') then
+        if ((main_pll_locked = '0') or (register_write_data(register_address_reset_c)(0) = '1')) then
             reset_vec_r <= (others => '0');
         elsif (rising_edge(clk_pll_50)) then
             if (reset_vec_r(reset_vec_r'high) = '0') then
                 reset_vec_r <= reset_vec_r + 1;
+            end if;
+            -- reset ethernet phy
+            if ((register_write_data(register_address_reset_c)(1) = '1') and (register_write_strb(register_address_reset_c) = '1')) then
+                reset_eth_vec_r <= (others => '0');
+            elsif (reset_eth_vec_r(reset_eth_vec_r'high) = '0') then
+                reset_eth_vec_r <= reset_eth_vec_r + 1;
             end if;
         end if;
     end process reset_proc;
@@ -523,11 +535,17 @@ begin
         end if;
     end process;
 
-    led0_n_o     <= led_vec_r(led_vec_r'high);
-    led1_n_o     <= led_vec_r(led_vec_r'high-1);
-    led2_n_o     <= led_vec_r(led_vec_r'high-2);
+    led0_o       <= led_vec_r(led_vec_r'high-3) when (reset = '1') else
+                    '1' when (led_vec_r(led_vec_r'high downto led_vec_r'high-1) = "00") else
+                    '0';
+    led1_o       <= led_vec_r(led_vec_r'high-3) when (reset = '1') else
+                    '1' when (led_vec_r(led_vec_r'high downto led_vec_r'high-1) = "01") or (led_vec_r(led_vec_r'high downto led_vec_r'high-1) = "11") else
+                    '0';
+    led2_o       <= led_vec_r(led_vec_r'high-3) when (reset = '1') else
+                    '1' when (led_vec_r(led_vec_r'high downto led_vec_r'high-1) = "10") else
+                    '0';
 
-    eth_rst_n_o  <= reset_n;
+    eth_rst_n_o  <= reset_n and reset_eth_vec_r(reset_eth_vec_r'high);
     eth_refclk_o <= clk_pll_50;
     eth_tx_en_o  <= tx_en;
     eth_tx_d0_o  <= tx_d(0);

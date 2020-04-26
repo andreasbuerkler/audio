@@ -70,6 +70,10 @@ begin
                     end if;
                 end if;
             end loop;
+
+            if (reset_i = '1') then
+                register_r <= register_init_g;
+            end if;
         end if;
     end process write_proc;
 

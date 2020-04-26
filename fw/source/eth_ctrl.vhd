@@ -74,7 +74,7 @@ architecture rtl of eth_ctrl is
     signal udp_valid_r          : std_logic := '0';
     signal udp_last_r           : std_logic := '0';
     signal udp_data_r           : std_logic_vector(7 downto 0) := (others => '0');
-    signal timeout_counter_r    : unsigned(15 downto 0) := (others => '0');
+    signal timeout_counter_r    : unsigned(17 downto 0) := (others => '0');
     signal timeout_counter_en_r : std_logic := '0';
     signal timeout_active_r     : std_logic := '0';
     signal data_counter_r       : unsigned(log2ceil(bytes_per_transfer_c)-1 downto 0) := (others => '0');
