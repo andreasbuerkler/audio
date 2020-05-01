@@ -53,26 +53,26 @@ port (
     ram_d7_io    : inout std_logic;
 
     -- lcd
-    lcd00_io     : inout std_logic;
-    lcd01_io     : inout std_logic;
-    lcd02_io     : inout std_logic;
-    lcd03_io     : inout std_logic;
-    lcd04_io     : inout std_logic;
-    lcd05_io     : inout std_logic;
-    lcd06_io     : inout std_logic;
-    lcd07_io     : inout std_logic;
-    lcd08_io     : inout std_logic;
-    lcd09_io     : inout std_logic;
-    lcd10_io     : inout std_logic;
-    lcd11_io     : inout std_logic;
-    lcd12_io     : inout std_logic;
-    lcd13_io     : inout std_logic;
-    lcd14_io     : inout std_logic;
-    lcd15_io     : inout std_logic;
-    lcd16_io     : inout std_logic;
-    lcd17_io     : inout std_logic;
-    lcd18_io     : inout std_logic;
-    lcd19_io     : inout std_logic
+    lcd00_io     : out   std_logic; -- R0
+    lcd01_io     : out   std_logic; -- R1
+    lcd02_io     : out   std_logic; -- R2
+    lcd03_io     : out   std_logic; -- R3
+    lcd04_io     : out   std_logic; -- G0
+    lcd05_io     : out   std_logic; -- G1
+    lcd06_io     : out   std_logic; -- G2
+    lcd07_io     : out   std_logic; -- G3
+    lcd08_io     : out   std_logic; -- B0
+    lcd09_io     : out   std_logic; -- B1
+    lcd10_io     : out   std_logic; -- DE
+    lcd11_io     : out   std_logic; -- DCLK
+    lcd12_io     : out   std_logic; -- VSYNC
+    lcd13_io     : out   std_logic; -- B3
+    lcd14_io     : out   std_logic; -- HSYNC
+    lcd15_io     : out   std_logic; -- B2
+    lcd16_io     : out   std_logic; -- DISP
+    lcd17_io     : out   std_logic; -- 
+    lcd18_io     : out   std_logic; -- 
+    lcd19_io     : out   std_logic  --  background led
 );
 end entity lcd_top;
 
@@ -80,11 +80,12 @@ architecture rtl of lcd_top is
 
     component main_pll is
     port (
-        rst_i    : in  std_logic;
-        clk_i    : in  std_logic;
-        clk_o    : out std_logic;
-        clk_90_o : out std_logic;
-        locked_o : out std_logic);
+        rst_i       : in  std_logic;
+        clk_i       : in  std_logic;
+        clk_o       : out std_logic;
+        clk_90_o    : out std_logic;
+        video_clk_o : out std_logic;
+        locked_o    : out std_logic);
     end component main_pll;
 
     component eth_mac is
@@ -237,6 +238,45 @@ architecture rtl of lcd_top is
         ctrl_ack_o        : out   std_logic);
     end component hyper_ram_controller;
 
+    component lcd_controller is
+    generic (
+        buffer_address_g         : std_logic_vector(31 downto 0);
+        ctrl_data_width_g        : positive;
+        ctrl_address_width_g     : positive;
+        ctrl_max_burst_size_g    : positive;
+        framebuffer_count_g      : positive;
+        color_bits_g             : positive;
+        image_width_g            : positive;
+        image_height_g           : positive;
+        vertical_front_porch_g   : positive;
+        vertical_back_porch_g    : positive;
+        vertical_pulse_g         : positive;
+        horizontal_front_porch_g : positive;
+        horizontal_back_porch_g  : positive;
+        horizontal_pulse_g       : positive);
+    port (
+        clk_i             : in  std_logic;
+        reset_i           : in  std_logic;
+        enable_i          : in  std_logic;
+        video_clk_i       : in  std_logic;
+        -- lcd
+        red_o             : out std_logic_vector(color_bits_g-1 downto 0);
+        blue_o            : out std_logic_vector(color_bits_g-1 downto 0);
+        green_o           : out std_logic_vector(color_bits_g-1 downto 0);
+        hsync_o           : out std_logic;
+        vsync_o           : out std_logic;
+        de_o              : out std_logic;
+        pclk_o            : out std_logic;
+        -- frame buffer
+        buffer_i          : in  std_logic_vector(framebuffer_count_g-1 downto 0);
+        buffer_o          : out std_logic_vector(framebuffer_count_g-1 downto 0);
+        ctrl_address_o    : out std_logic_vector(ctrl_address_width_g-1 downto 0);
+        ctrl_data_i       : in  std_logic_vector(ctrl_data_width_g-1 downto 0);
+        ctrl_burst_size_o : out std_logic_vector(log2ceil(ctrl_max_burst_size_g) downto 0);
+        ctrl_strobe_o     : out std_logic;
+        ctrl_ack_i        : in  std_logic);
+    end component lcd_controller;
+
     constant main_clock_frequency_c : positive := 50000000;
     constant i2c_clock_frequency_c  : positive := 100000;
 
@@ -272,7 +312,7 @@ architecture rtl of lcd_top is
                                     others                          => '0');
     constant register_mask_c      : std_logic_array_32(register_count_c-1 downto 0) :=
                                    (register_address_version_c      => x"ffffffff",
-                                    register_address_test_c         => x"000000ff",
+                                    register_address_test_c         => x"00000003",
                                     register_address_reset_c        => x"00000003",
                                     others                          => x"ffffffff");
 
@@ -327,17 +367,19 @@ architecture rtl of lcd_top is
     signal reset_n            : std_logic;
     signal clk_pll_50         : std_logic;
     signal clk_pll_50_shifted : std_logic;
+    signal clk_video          : std_logic;
     signal main_pll_locked    : std_logic;
 
 begin
 
     i_main_pll : main_pll
     port map (
-        rst_i    => '0',
-        clk_i    => clk50_000_i,
-        clk_o    => clk_pll_50,
-        clk_90_o => clk_pll_50_shifted,
-        locked_o => main_pll_locked);
+        rst_i       => '0',
+        clk_i       => clk50_000_i,
+        clk_o       => clk_pll_50,
+        clk_90_o    => clk_pll_50_shifted,
+        video_clk_o => clk_video,
+        locked_o    => main_pll_locked);
 
     i_mac : eth_mac
     generic map (
@@ -503,11 +545,57 @@ begin
         ctrl_write_i   => slave_write(slave_hyper_ram_c),
         ctrl_ack_o     => slave_ack(slave_hyper_ram_c));
 
-    -- register bank read
-    register_read_data(register_address_test_c) <= x"12345678";
-    register_read_strb(register_address_test_c) <= '0';
+    i_lcd : lcd_controller
+    generic map (
+        buffer_address_g         => x"00000000",
+        ctrl_data_width_g        => 32,
+        ctrl_address_width_g     => 32,
+        ctrl_max_burst_size_g    => 32,
+        framebuffer_count_g      => 3,
+        color_bits_g             => 4,
+        image_width_g            => 320,
+        image_height_g           => 240,
+        vertical_front_porch_g   => 4,
+        vertical_back_porch_g    => 16,
+        vertical_pulse_g         => 2,
+        horizontal_front_porch_g => 20,
+        horizontal_back_porch_g  => 66,
+        horizontal_pulse_g       => 2)
+    port map (
+        clk_i             => clk_pll_50,
+        reset_i           => reset,
+        enable_i          => '1',
+        video_clk_i       => clk_video,
+        -- lcd
+        red_o(0)          => lcd00_io,
+        red_o(1)          => lcd01_io,
+        red_o(2)          => lcd02_io,
+        red_o(3)          => lcd03_io,
+        blue_o(0)         => lcd08_io,
+        blue_o(1)         => lcd09_io,
+        blue_o(2)         => lcd15_io,
+        blue_o(3)         => lcd13_io,
+        green_o(0)        => lcd04_io,
+        green_o(1)        => lcd05_io,
+        green_o(2)        => lcd06_io,
+        green_o(3)        => lcd07_io,
+        hsync_o           => lcd14_io,
+        vsync_o           => lcd12_io,
+        de_o              => lcd10_io,
+        pclk_o            => lcd11_io,
+        -- frame buffer
+        buffer_i          => "000",
+        buffer_o          => open,
+        ctrl_address_o    => open,
+        ctrl_data_i       => register_write_data(3),
+        ctrl_burst_size_o => open,
+        ctrl_strobe_o     => open,
+        ctrl_ack_i        => register_write_strb(3));
 
-    reset_proc : process (clk_pll_50, main_pll_locked)
+    lcd16_io  <= register_write_data(register_address_test_c)(1); -- DISP
+    lcd19_io  <= register_write_data(register_address_test_c)(0); -- LCD background light enable
+
+    reset_proc : process (clk_pll_50, main_pll_locked, register_write_data)
     begin
         if ((main_pll_locked = '0') or (register_write_data(register_address_reset_c)(0) = '1')) then
             reset_vec_r <= (others => '0');

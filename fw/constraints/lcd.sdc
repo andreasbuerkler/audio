@@ -17,6 +17,7 @@ derive_pll_clocks
 # Main PLL
 set main_pll_clk         "i_main_pll|i_pll|general[0].gpll~PLL_OUTPUT_COUNTER|divclk"
 set main_pll_clk_shifted "i_main_pll|i_pll|general[1].gpll~PLL_OUTPUT_COUNTER|divclk"
+set main_pll_video_clk   "i_main_pll|i_pll|general[2].gpll~PLL_OUTPUT_COUNTER|divclk"
 
 # ETH clock
 create_generated_clock -name eth_tx_clk -source [get_pins ${main_pll_clk}] [get_ports {eth_refclk_o}]
@@ -97,3 +98,9 @@ set_output_delay -min 0.0 -clock [get_clocks i2c_clk] [get_ports {i2c_sda_io}]
 set_false_path -to led0_o
 set_false_path -to led1_o
 set_false_path -to led2_o
+
+# ------------------------------------------------------------------------------
+# LCD
+# ------------------------------------------------------------------------------
+set_false_path -from [get_clocks ${main_pll_clk}] -to [get_clocks ${main_pll_video_clk}]
+set_false_path -from [get_clocks ${main_pll_video_clk}] -to [get_clocks ${main_pll_clk}]

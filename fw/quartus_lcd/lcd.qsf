@@ -53,6 +53,18 @@ set_global_assignment -name POWER_BOARD_THERMAL_MODEL "NONE (CONSERVATIVE)"
 set_global_assignment -name PARTITION_NETLIST_TYPE SOURCE -section_id Top
 set_global_assignment -name PARTITION_FITTER_PRESERVATION_LEVEL PLACEMENT_AND_ROUTING -section_id Top
 set_global_assignment -name PARTITION_COLOR 16764057 -section_id Top
+set_global_assignment -name ENABLE_OCT_DONE OFF
+set_global_assignment -name ENABLE_CONFIGURATION_PINS OFF
+set_global_assignment -name ENABLE_BOOT_SEL_PIN OFF
+set_global_assignment -name STRATIXV_CONFIGURATION_SCHEME "ACTIVE SERIAL X1"
+set_global_assignment -name USE_CONFIGURATION_DEVICE ON
+set_global_assignment -name CRC_ERROR_OPEN_DRAIN ON
+set_global_assignment -name OUTPUT_IO_TIMING_NEAR_END_VMEAS "HALF VCCIO" -rise
+set_global_assignment -name OUTPUT_IO_TIMING_NEAR_END_VMEAS "HALF VCCIO" -fall
+set_global_assignment -name OUTPUT_IO_TIMING_FAR_END_VMEAS "HALF SIGNAL SWING" -rise
+set_global_assignment -name OUTPUT_IO_TIMING_FAR_END_VMEAS "HALF SIGNAL SWING" -fall
+set_global_assignment -name ACTIVE_SERIAL_CLOCK FREQ_100MHZ
+set_global_assignment -name ENABLE_INIT_DONE_OUTPUT ON
 set_global_assignment -name IOBANK_VCCIO 3.3V -section_id 5B
 set_global_assignment -name IOBANK_VCCIO 3.3V -section_id 5A
 set_global_assignment -name IOBANK_VCCIO 3.3V -section_id 4A
@@ -105,6 +117,11 @@ set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to ram_d5_io
 set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to ram_d6_io
 set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to ram_d7_io
 set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to ram_rst_n_o
+set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to user_reserve_1
+set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to ram_rwds_io
+set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to led0_o
+set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to led1_o
+set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to led2_o
 set_location_assignment PIN_T7 -to eth_mdc_o
 set_location_assignment PIN_T5 -to eth_mdio_io
 set_location_assignment PIN_N1 -to eth_refclk_o
@@ -137,6 +154,7 @@ set_location_assignment PIN_D14 -to lcd18_io
 set_location_assignment PIN_B15 -to lcd19_io
 set_location_assignment PIN_T13 -to ram_clk_o
 set_location_assignment PIN_P9 -to ram_cs_n_o
+set_location_assignment PIN_R10 -to ram_rwds_io
 set_location_assignment PIN_R9 -to ram_d0_io
 set_location_assignment PIN_T12 -to ram_d1_io
 set_location_assignment PIN_R7 -to ram_d2_io
@@ -148,24 +166,12 @@ set_location_assignment PIN_R12 -to ram_d7_io
 set_location_assignment PIN_T15 -to ram_rst_n_o
 set_location_assignment PIN_A4 -to i2c_scl_o
 set_location_assignment PIN_A3 -to i2c_sda_io
+set_location_assignment PIN_M10 -to led0_o
+set_location_assignment PIN_L10 -to led1_o
+set_location_assignment PIN_L7 -to led2_o
 set_location_assignment PIN_F8 -to clk50_000_i
 set_location_assignment PIN_N3 -to user_reserve_1
 set_instance_assignment -name RESERVE_PIN AS_OUTPUT_DRIVING_GROUND -to user_reserve_1
-set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to user_reserve_1
-set_global_assignment -name ENABLE_OCT_DONE OFF
-set_global_assignment -name ENABLE_CONFIGURATION_PINS OFF
-set_global_assignment -name ENABLE_BOOT_SEL_PIN OFF
-set_global_assignment -name STRATIXV_CONFIGURATION_SCHEME "ACTIVE SERIAL X1"
-set_global_assignment -name USE_CONFIGURATION_DEVICE ON
-set_global_assignment -name CRC_ERROR_OPEN_DRAIN ON
-set_global_assignment -name OUTPUT_IO_TIMING_NEAR_END_VMEAS "HALF VCCIO" -rise
-set_global_assignment -name OUTPUT_IO_TIMING_NEAR_END_VMEAS "HALF VCCIO" -fall
-set_global_assignment -name OUTPUT_IO_TIMING_FAR_END_VMEAS "HALF SIGNAL SWING" -rise
-set_global_assignment -name OUTPUT_IO_TIMING_FAR_END_VMEAS "HALF SIGNAL SWING" -fall
-set_global_assignment -name ACTIVE_SERIAL_CLOCK FREQ_100MHZ
-set_global_assignment -name ENABLE_INIT_DONE_OUTPUT ON
-set_location_assignment PIN_R10 -to ram_rwds_io
-set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to ram_rwds_io
 set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to ram_d0_io
 set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to ram_d1_io
 set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to ram_d2_io
@@ -194,12 +200,14 @@ set_instance_assignment -name D3_DELAY 0 -to ram_d3_io
 set_instance_assignment -name D3_DELAY 0 -to ram_d4_io
 set_instance_assignment -name D3_DELAY 0 -to ram_d5_io
 set_instance_assignment -name D3_DELAY 0 -to ram_d6_io
+set_global_assignment -name SDC_FILE ../constraints/lcd.sdc
+set_global_assignment -name VHDL_FILE ../source/fifo_dual_clock.vhd
+set_global_assignment -name VHDL_FILE ../source/lcd_controller.vhd
 set_global_assignment -name VHDL_FILE ../source/main_pll.vhd
 set_global_assignment -name VHDL_FILE ../source/i2c_master.vhd
 set_global_assignment -name VHDL_FILE ../source/interconnect.vhd
 set_global_assignment -name VHDL_FILE ../source/mdio_debug.vhd
 set_global_assignment -name VHDL_FILE ../source/hyper_ram_controller.vhd
-set_global_assignment -name SDC_FILE ../constraints/lcd.sdc
 set_global_assignment -name VHDL_FILE ../source/registerbank.vhd
 set_global_assignment -name VHDL_FILE ../source/rmii_interface.vhd
 set_global_assignment -name VHDL_FILE ../source/ram.vhd
@@ -217,10 +225,4 @@ set_global_assignment -name VHDL_FILE ../source/eth_fcs.vhd
 set_global_assignment -name VHDL_FILE ../source/eth_ctrl.vhd
 set_global_assignment -name VHDL_FILE ../source/crc32.vhd
 set_global_assignment -name VHDL_FILE ../source/lcd_top.vhd
-set_location_assignment PIN_M10 -to led0_o
-set_location_assignment PIN_L10 -to led1_o
-set_location_assignment PIN_L7 -to led2_o
-set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to led0_o
-set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to led1_o
-set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to led2_o
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top

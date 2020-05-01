@@ -10,11 +10,12 @@ use ieee.std_logic_1164.all;
 
 entity main_pll is
     port (
-        rst_i    : in  std_logic;
-        clk_i    : in  std_logic;
-        clk_o    : out std_logic;
-        clk_90_o : out std_logic;
-        locked_o : out std_logic);
+        rst_i       : in  std_logic;
+        clk_i       : in  std_logic;
+        clk_o       : out std_logic;
+        clk_90_o    : out std_logic;
+        video_clk_o : out std_logic;
+        locked_o    : out std_logic);
 end main_pll;
 
 architecture rtl of main_pll is
@@ -97,14 +98,14 @@ begin
         fractional_vco_multiplier => "false",
         reference_clock_frequency => "50.0 MHz",
         operation_mode            => "normal",
-        number_of_clocks          => 2,
+        number_of_clocks          => 3,
         output_clock_frequency0   => "50.000000 MHz",
         phase_shift0              => "0 ps",
         duty_cycle0               => 50,
         output_clock_frequency1   => "50.000000 MHz",
         phase_shift1              => "5000 ps",
         duty_cycle1               => 50,
-        output_clock_frequency2   => "0 MHz",
+        output_clock_frequency2   => "6.400000 MHz",
         phase_shift2              => "0 ps",
         duty_cycle2               => 50,
         output_clock_frequency3   => "0 MHz",
@@ -158,6 +159,7 @@ begin
         rst       => rst_i,
         outclk(0) => clk_o,
         outclk(1) => clk_90_o,
+        outclk(2) => video_clk_o,
         locked    => locked_o,
         fboutclk  => open,
         fbclk     => '0',
