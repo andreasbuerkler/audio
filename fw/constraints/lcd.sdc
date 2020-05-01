@@ -22,14 +22,17 @@ set main_pll_video_clk   "i_main_pll|i_pll|general[2].gpll~PLL_OUTPUT_COUNTER|di
 # ETH clock
 create_generated_clock -name eth_tx_clk -source [get_pins ${main_pll_clk}] [get_ports {eth_refclk_o}]
 
-# Hyper RAM clocks
-create_generated_clock -name ram_clk -source [get_pins ${main_pll_clk_shifted}] -multiply_by 1 [get_ports {ram_clk_o}]
+# Hyper RAM clock
+create_generated_clock -name ram_clk -source [get_pins ${main_pll_clk_shifted}] [get_ports {ram_clk_o}]
+
+# LCD clock
+create_generated_clock -name video_clk -source [get_pins ${main_pll_video_clk}] -invert [get_ports {lcd_clk_o}]
 
 # I2C clock
 create_generated_clock -name i2c_clk_int -source [get_pins ${main_pll_clk}] -divide_by 500 [get_registers {i_i2c_master|scl_r}]
-create_generated_clock -name i2c_clk -source [get_registers {i_i2c_master|scl_r}] -multiply_by 1 [get_ports {i2c_scl_o}]
+create_generated_clock -name i2c_clk -source [get_registers {i_i2c_master|scl_r}] [get_ports {i2c_scl_o}]
 
-create_generated_clock -name ram_return_clk -source [get_ports {ram_clk_o}] -multiply_by 1 [get_ports {ram_rwds_io}]
+create_generated_clock -name ram_return_clk -source [get_ports {ram_clk_o}] [get_ports {ram_rwds_io}]
 set_clock_latency -source -early 1.0 [get_clocks {ram_return_clk}]
 set_clock_latency -source -late 7.0 [get_clocks {ram_return_clk}]
 
@@ -104,3 +107,15 @@ set_false_path -to led2_o
 # ------------------------------------------------------------------------------
 set_false_path -from [get_clocks ${main_pll_clk}] -to [get_clocks ${main_pll_video_clk}]
 set_false_path -from [get_clocks ${main_pll_video_clk}] -to [get_clocks ${main_pll_clk}]
+
+set_false_path -to lcd_disp_o
+set_false_path -to lcd_back_led_o
+
+set_output_delay -clock video_clk -max 12.000 [get_ports {lcd_red_0_o lcd_red_1_o lcd_red_2_o lcd_red_3_o}]
+set_output_delay -clock video_clk -min -12.000 [get_ports {lcd_red_0_o lcd_red_1_o lcd_red_2_o lcd_red_3_o}]
+set_output_delay -clock video_clk -max 12.000 [get_ports {lcd_green_0_o lcd_green_1_o lcd_green_2_o lcd_green_3_o}]
+set_output_delay -clock video_clk -min -12.000 [get_ports {lcd_green_0_o lcd_green_1_o lcd_green_2_o lcd_green_3_o}]
+set_output_delay -clock video_clk -max 12.000 [get_ports {lcd_blue_0_o lcd_blue_1_o lcd_blue_2_o lcd_blue_3_o}]
+set_output_delay -clock video_clk -min -12.000 [get_ports {lcd_blue_0_o lcd_blue_1_o lcd_blue_2_o lcd_blue_3_o}]
+set_output_delay -clock video_clk -max 20.000 [get_ports {lcd_de_o lcd_vsync_o lcd_hsync_o}]
+set_output_delay -clock video_clk -min -20.000 [get_ports {lcd_de_o lcd_vsync_o lcd_hsync_o}]

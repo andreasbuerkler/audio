@@ -15,64 +15,62 @@ use work.fpga_pkg.all;
 entity lcd_top is
 port (
     -- clock input
-    clk50_000_i  : in    std_logic;
+    clk50_000_i    : in    std_logic;
 
     --debug
-    led0_o       : out   std_logic;
-    led1_o       : out   std_logic;
-    led2_o       : out   std_logic;
+    led0_o         : out   std_logic;
+    led1_o         : out   std_logic;
+    led2_o         : out   std_logic;
 
     -- i2c
-    i2c_scl_o    : out   std_logic;
-    i2c_sda_io   : inout std_logic;
+    i2c_scl_o      : out   std_logic;
+    i2c_sda_io     : inout std_logic;
 
     -- eth
-    eth_rst_n_o  : out   std_logic;
-    eth_refclk_o : out   std_logic;
-    eth_rx_d0_i  : in    std_logic;
-    eth_rx_d1_i  : in    std_logic;
-    eth_rx_dv_i  : in    std_logic;
-    eth_tx_d0_o  : out   std_logic;
-    eth_tx_d1_o  : out   std_logic;
-    eth_tx_en_o  : out   std_logic;
-    eth_mdio_io  : inout std_logic;
-    eth_mdc_o    : out   std_logic;
+    eth_rst_n_o    : out   std_logic;
+    eth_refclk_o   : out   std_logic;
+    eth_rx_d0_i    : in    std_logic;
+    eth_rx_d1_i    : in    std_logic;
+    eth_rx_dv_i    : in    std_logic;
+    eth_tx_d0_o    : out   std_logic;
+    eth_tx_d1_o    : out   std_logic;
+    eth_tx_en_o    : out   std_logic;
+    eth_mdio_io    : inout std_logic;
+    eth_mdc_o      : out   std_logic;
 
     -- hyper ram
-    ram_rst_n_o  : out   std_logic;
-    ram_cs_n_o   : out   std_logic;
-    ram_clk_o    : out   std_logic;
-    ram_rwds_io  : inout std_logic;
-    ram_d0_io    : inout std_logic;
-    ram_d1_io    : inout std_logic;
-    ram_d2_io    : inout std_logic;
-    ram_d3_io    : inout std_logic;
-    ram_d4_io    : inout std_logic;
-    ram_d5_io    : inout std_logic;
-    ram_d6_io    : inout std_logic;
-    ram_d7_io    : inout std_logic;
+    ram_rst_n_o    : out   std_logic;
+    ram_cs_n_o     : out   std_logic;
+    ram_clk_o      : out   std_logic;
+    ram_rwds_io    : inout std_logic;
+    ram_d0_io      : inout std_logic;
+    ram_d1_io      : inout std_logic;
+    ram_d2_io      : inout std_logic;
+    ram_d3_io      : inout std_logic;
+    ram_d4_io      : inout std_logic;
+    ram_d5_io      : inout std_logic;
+    ram_d6_io      : inout std_logic;
+    ram_d7_io      : inout std_logic;
 
     -- lcd
-    lcd00_io     : out   std_logic; -- R0
-    lcd01_io     : out   std_logic; -- R1
-    lcd02_io     : out   std_logic; -- R2
-    lcd03_io     : out   std_logic; -- R3
-    lcd04_io     : out   std_logic; -- G0
-    lcd05_io     : out   std_logic; -- G1
-    lcd06_io     : out   std_logic; -- G2
-    lcd07_io     : out   std_logic; -- G3
-    lcd08_io     : out   std_logic; -- B0
-    lcd09_io     : out   std_logic; -- B1
-    lcd10_io     : out   std_logic; -- DE
-    lcd11_io     : out   std_logic; -- DCLK
-    lcd12_io     : out   std_logic; -- VSYNC
-    lcd13_io     : out   std_logic; -- B3
-    lcd14_io     : out   std_logic; -- HSYNC
-    lcd15_io     : out   std_logic; -- B2
-    lcd16_io     : out   std_logic; -- DISP
-    lcd17_io     : out   std_logic; -- 
-    lcd18_io     : out   std_logic; -- 
-    lcd19_io     : out   std_logic  --  background led
+    lcd_red_0_o    : out   std_logic;
+    lcd_red_1_o    : out   std_logic;
+    lcd_red_2_o    : out   std_logic;
+    lcd_red_3_o    : out   std_logic;
+    lcd_green_0_o  : out   std_logic;
+    lcd_green_1_o  : out   std_logic;
+    lcd_green_2_o  : out   std_logic;
+    lcd_green_3_o  : out   std_logic;
+    lcd_blue_0_o   : out   std_logic;
+    lcd_blue_1_o   : out   std_logic;
+    lcd_blue_2_o   : out   std_logic;
+    lcd_blue_3_o   : out   std_logic;
+    lcd_clk_o      : out   std_logic;
+    lcd_de_o       : out   std_logic;
+    lcd_vsync_o    : out   std_logic;
+    lcd_hsync_o    : out   std_logic;
+    lcd_disp_o     : out   std_logic;
+    lcd_back_led_o : out   std_logic
 );
 end entity lcd_top;
 
@@ -567,22 +565,22 @@ begin
         enable_i          => '1',
         video_clk_i       => clk_video,
         -- lcd
-        red_o(0)          => lcd00_io,
-        red_o(1)          => lcd01_io,
-        red_o(2)          => lcd02_io,
-        red_o(3)          => lcd03_io,
-        blue_o(0)         => lcd08_io,
-        blue_o(1)         => lcd09_io,
-        blue_o(2)         => lcd15_io,
-        blue_o(3)         => lcd13_io,
-        green_o(0)        => lcd04_io,
-        green_o(1)        => lcd05_io,
-        green_o(2)        => lcd06_io,
-        green_o(3)        => lcd07_io,
-        hsync_o           => lcd14_io,
-        vsync_o           => lcd12_io,
-        de_o              => lcd10_io,
-        pclk_o            => lcd11_io,
+        red_o(0)          => lcd_red_0_o,
+        red_o(1)          => lcd_red_1_o,
+        red_o(2)          => lcd_red_2_o,
+        red_o(3)          => lcd_red_3_o,
+        blue_o(0)         => lcd_blue_0_o,
+        blue_o(1)         => lcd_blue_1_o,
+        blue_o(2)         => lcd_blue_2_o,
+        blue_o(3)         => lcd_blue_3_o,
+        green_o(0)        => lcd_green_0_o,
+        green_o(1)        => lcd_green_1_o,
+        green_o(2)        => lcd_green_2_o,
+        green_o(3)        => lcd_green_3_o,
+        hsync_o           => lcd_hsync_o,
+        vsync_o           => lcd_vsync_o,
+        de_o              => lcd_de_o,
+        pclk_o            => lcd_clk_o,
         -- frame buffer
         buffer_i          => "000",
         buffer_o          => open,
@@ -592,8 +590,8 @@ begin
         ctrl_strobe_o     => open,
         ctrl_ack_i        => register_write_strb(3));
 
-    lcd16_io  <= register_write_data(register_address_test_c)(1); -- DISP
-    lcd19_io  <= register_write_data(register_address_test_c)(0); -- LCD background light enable
+    lcd_disp_o  <= register_write_data(register_address_test_c)(1);
+    lcd_back_led_o  <= register_write_data(register_address_test_c)(0);
 
     reset_proc : process (clk_pll_50, main_pll_locked, register_write_data)
     begin

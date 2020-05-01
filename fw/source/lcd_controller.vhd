@@ -209,7 +209,7 @@ begin
     hsync_o <= hsync_r;
     vsync_o <= vsync_r;
     de_o <= de_r;
-    pclk_o <= video_clk_i;
+    pclk_o <= not video_clk_i;
 
     buffer_o <= buffer_sel_r;
     ctrl_address_o <= address_r;
