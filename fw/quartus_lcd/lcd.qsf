@@ -65,6 +65,7 @@ set_global_assignment -name OUTPUT_IO_TIMING_FAR_END_VMEAS "HALF SIGNAL SWING" -
 set_global_assignment -name OUTPUT_IO_TIMING_FAR_END_VMEAS "HALF SIGNAL SWING" -fall
 set_global_assignment -name ACTIVE_SERIAL_CLOCK FREQ_100MHZ
 set_global_assignment -name ENABLE_INIT_DONE_OUTPUT ON
+set_global_assignment -name NUM_PARALLEL_PROCESSORS 8
 set_global_assignment -name IOBANK_VCCIO 3.3V -section_id 5B
 set_global_assignment -name IOBANK_VCCIO 3.3V -section_id 5A
 set_global_assignment -name IOBANK_VCCIO 3.3V -section_id 4A

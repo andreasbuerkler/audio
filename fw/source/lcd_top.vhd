@@ -168,24 +168,27 @@ architecture rtl of lcd_top is
     generic (
         address_map_g          : std_logic_array;
         master_data_width_g    : positive;
-        master_address_width_g : positive);
+        master_address_width_g : positive;
+        master_burst_size_g    : positive);
     port (
-        clk_i            : in std_logic;
-        reset_i          : in std_logic;
+        clk_i               : in std_logic;
+        reset_i             : in std_logic;
         -- master
-        master_address_i : in  std_logic_vector(master_address_width_g-1 downto 0);
-        master_data_i    : in  std_logic_vector(master_data_width_g-1 downto 0);
-        master_data_o    : out std_logic_vector(master_data_width_g-1 downto 0);
-        master_strobe_i  : in  std_logic;
-        master_write_i   : in  std_logic;
-        master_ack_o     : out std_logic;
+        master_address_i    : in  std_logic_vector(master_address_width_g-1 downto 0);
+        master_data_i       : in  std_logic_vector(master_data_width_g-1 downto 0);
+        master_data_o       : out std_logic_vector(master_data_width_g-1 downto 0);
+        master_burst_size_i : in  std_logic_vector(log2ceil(master_burst_size_g)-1 downto 0);
+        master_strobe_i     : in  std_logic;
+        master_write_i      : in  std_logic;
+        master_ack_o        : out std_logic;
         -- slave
-        slave_address_o : out std_logic_array;
-        slave_data_i    : in  std_logic_array;
-        slave_data_o    : out std_logic_array;
-        slave_strobe_o  : out std_logic_vector;
-        slave_write_o   : out std_logic_vector;
-        slave_ack_i     : in  std_logic_vector);
+        slave_address_o     : out std_logic_array;
+        slave_data_i        : in  std_logic_array;
+        slave_data_o        : out std_logic_array;
+        slave_burst_size_o  : out std_logic_array;
+        slave_strobe_o      : out std_logic_vector;
+        slave_write_o       : out std_logic_vector;
+        slave_ack_i         : in  std_logic_vector);
     end component interconnect;
 
     component i2c_master is
@@ -278,8 +281,9 @@ architecture rtl of lcd_top is
     constant main_clock_frequency_c : positive := 50000000;
     constant i2c_clock_frequency_c  : positive := 100000;
 
-    constant ctrl_address_width_c : positive := 24;
-    constant ctrl_data_width_c    : positive := 32;
+    constant ctrl_address_width_c  : positive := 24;
+    constant ctrl_data_width_c     : positive := 32;
+    constant ctrl_max_burst_size_c : positive := 32;
 
     constant mac_address_c   : std_logic_vector(47 downto 0) := x"3C8D20040506";
     constant ip_address_c    : std_logic_vector(31 downto 0) := x"C0A80064";
@@ -344,6 +348,7 @@ architecture rtl of lcd_top is
     signal slave_address         : std_logic_array(number_of_slaves_c-1 downto 0, ctrl_address_width_c-1 downto 0);
     signal slave_read_data       : std_logic_array(number_of_slaves_c-1 downto 0, ctrl_data_width_c-1 downto 0);
     signal slave_write_data      : std_logic_array(number_of_slaves_c-1 downto 0, ctrl_data_width_c-1 downto 0);
+    signal slave_burst_size      : std_logic_array(number_of_slaves_c-1 downto 0, log2ceil(ctrl_max_burst_size_c)-1 downto 0);
     signal slave_strobe          : std_logic_vector(number_of_slaves_c-1 downto 0);
     signal slave_write           : std_logic_vector(number_of_slaves_c-1 downto 0);
     signal slave_ack             : std_logic_vector(number_of_slaves_c-1 downto 0);
@@ -434,24 +439,27 @@ begin
     generic map (
         address_map_g          => address_map_c,
         master_data_width_g    => ctrl_data_width_c,
-        master_address_width_g => ctrl_address_width_c)
+        master_address_width_g => ctrl_address_width_c,
+        master_burst_size_g    => ctrl_max_burst_size_c)
     port map (
-        clk_i            => clk_pll_50,
-        reset_i          => reset,
+        clk_i               => clk_pll_50,
+        reset_i             => reset,
         -- master
-        master_address_i => ctrl_address,
-        master_data_i    => ctrl_data_out,
-        master_data_o    => ctrl_data_in,
-        master_strobe_i  => ctrl_strobe,
-        master_write_i   => ctrl_write,
-        master_ack_o     => ctrl_ack,
+        master_address_i    => ctrl_address,
+        master_data_i       => ctrl_data_out,
+        master_data_o       => ctrl_data_in,
+        master_burst_size_i => "00000",
+        master_strobe_i     => ctrl_strobe,
+        master_write_i      => ctrl_write,
+        master_ack_o        => ctrl_ack,
         -- slave
-        slave_address_o => slave_address,
-        slave_data_i    => slave_read_data,
-        slave_data_o    => slave_write_data,
-        slave_strobe_o  => slave_strobe,
-        slave_write_o   => slave_write,
-        slave_ack_i     => slave_ack);
+        slave_address_o    => slave_address,
+        slave_data_i       => slave_read_data,
+        slave_data_o       => slave_write_data,
+        slave_burst_size_o => slave_burst_size,
+        slave_strobe_o     => slave_strobe,
+        slave_write_o      => slave_write,
+        slave_ack_i        => slave_ack);
 
     registerbank_read_data_gen : for i in ctrl_data_width_c-1 downto 0 generate
         slave_read_data(slave_registerbank_c, i) <= registerbank_readdata(i);
