@@ -115,27 +115,29 @@ architecture rtl of lcd_top is
         ip_address_g         : std_logic_vector(31 downto 0);
         ctrl_port_g          : std_logic_vector(15 downto 0);
         ctrl_address_width_g : positive;
-        ctrl_data_width_g    : positive);
+        ctrl_data_width_g    : positive;
+        ctrl_burst_size_g    : positive);
     port (
-        clk_i          : in  std_logic;
-        reset_i        : in  std_logic;
+        clk_i             : in  std_logic;
+        reset_i           : in  std_logic;
         -- mac rx
-        mac_valid_i    : in  std_logic;
-        mac_ready_o    : out std_logic;
-        mac_last_i     : in  std_logic;
-        mac_data_i     : in  std_logic_vector(7 downto 0);
+        mac_valid_i       : in  std_logic;
+        mac_ready_o       : out std_logic;
+        mac_last_i        : in  std_logic;
+        mac_data_i        : in  std_logic_vector(7 downto 0);
         -- mac tx
-        mac_valid_o    : out std_logic;
-        mac_ready_i    : in  std_logic;
-        mac_last_o     : out std_logic;
-        mac_data_o     : out std_logic_vector(7 downto 0);
+        mac_valid_o       : out std_logic;
+        mac_ready_i       : in  std_logic;
+        mac_last_o        : out std_logic;
+        mac_data_o        : out std_logic_vector(7 downto 0);
         -- ctrl
-        ctrl_address_o : out std_logic_vector(ctrl_address_width_g-1 downto 0);
-        ctrl_data_o    : out std_logic_vector(ctrl_data_width_g-1 downto 0);
-        ctrl_data_i    : in  std_logic_vector(ctrl_data_width_g-1 downto 0);
-        ctrl_strobe_o  : out std_logic;
-        ctrl_write_o   : out std_logic;
-        ctrl_ack_i     : in  std_logic);
+        ctrl_address_o    : out std_logic_vector(ctrl_address_width_g-1 downto 0);
+        ctrl_data_o       : out std_logic_vector(ctrl_data_width_g-1 downto 0);
+        ctrl_data_i       : in  std_logic_vector(ctrl_data_width_g-1 downto 0);
+        ctrl_burst_size_o : out std_logic_vector(log2ceil(ctrl_burst_size_g)-1 downto 0);
+        ctrl_strobe_o     : out std_logic;
+        ctrl_write_o      : out std_logic;
+        ctrl_ack_i        : in  std_logic);
     end component eth_subsystem;
 
     component registerbank is
@@ -145,23 +147,25 @@ architecture rtl of lcd_top is
         register_mask_g  : std_logic_array_32;
         read_only_g      : std_logic_vector;
         data_width_g     : positive;
-        address_width_g  : positive);
+        address_width_g  : positive;
+        burst_size_g     : positive);
     port (
-        clk_i          : in  std_logic;
-        reset_i        : in  std_logic;
+        clk_i             : in  std_logic;
+        reset_i           : in  std_logic;
         -- register
-        data_i         : in  std_logic_array_32(register_count_g-1 downto 0);
-        data_strb_i    : in  std_logic_vector(register_count_g-1 downto 0);
-        data_o         : out std_logic_array_32(register_count_g-1 downto 0);
-        data_strb_o    : out std_logic_vector(register_count_g-1 downto 0);
-        read_strb_o    : out std_logic_vector(register_count_g-1 downto 0);
+        data_i            : in  std_logic_array_32(register_count_g-1 downto 0);
+        data_strb_i       : in  std_logic_vector(register_count_g-1 downto 0);
+        data_o            : out std_logic_array_32(register_count_g-1 downto 0);
+        data_strb_o       : out std_logic_vector(register_count_g-1 downto 0);
+        read_strb_o       : out std_logic_vector(register_count_g-1 downto 0);
         -- ctrl bus
-        ctrl_address_i : in  std_logic_vector(address_width_g-1 downto 0);
-        ctrl_data_i    : in  std_logic_vector(data_width_g-1 downto 0);
-        ctrl_data_o    : out std_logic_vector(data_width_g-1 downto 0);
-        ctrl_strobe_i  : in  std_logic;
-        ctrl_write_i   : in  std_logic;
-        ctrl_ack_o     : out std_logic);
+        ctrl_address_i    : in  std_logic_vector(address_width_g-1 downto 0);
+        ctrl_data_i       : in  std_logic_vector(data_width_g-1 downto 0);
+        ctrl_data_o       : out std_logic_vector(data_width_g-1 downto 0);
+        ctrl_burst_size_i : in  std_logic_vector(log2ceil(burst_size_g)-1 downto 0);
+        ctrl_strobe_i     : in  std_logic;
+        ctrl_write_i      : in  std_logic;
+        ctrl_ack_o        : out std_logic);
     end component registerbank;
 
     component interconnect is
@@ -193,21 +197,23 @@ architecture rtl of lcd_top is
 
     component i2c_master is
     generic (
-        freq_in_g  : positive;
-        freq_out_g : positive);
+        freq_in_g    : positive;
+        freq_out_g   : positive;
+        burst_size_g : positive);
     port (
-        clk_i     : in  std_logic;
-        reset_i   : in  std_logic;
-        scl_o     : out std_logic;
-        sda_i     : in  std_logic;
-        sda_o     : out std_logic;
+        clk_i        : in  std_logic;
+        reset_i      : in  std_logic;
+        scl_o        : out std_logic;
+        sda_i        : in  std_logic;
+        sda_o        : out std_logic;
         -- ctrl bus
-        address_i : in  std_logic_vector(9 downto 0);
-        data_i    : in  std_logic_vector(31 downto 0);
-        data_o    : out std_logic_vector(31 downto 0);
-        strobe_i  : in  std_logic;
-        write_i   : in  std_logic;
-        ack_o     : out std_logic);
+        address_i    : in  std_logic_vector(9 downto 0);
+        data_i       : in  std_logic_vector(31 downto 0);
+        data_o       : out std_logic_vector(31 downto 0);
+        burst_size_i : in  std_logic_vector(log2ceil(burst_size_g)-1 downto 0);
+        strobe_i     : in  std_logic;
+        write_i      : in  std_logic;
+        ack_o        : out std_logic);
     end component i2c_master;
 
     component hyper_ram_controller is
@@ -337,12 +343,13 @@ architecture rtl of lcd_top is
     signal i2c_scl  : std_logic;
 
     -- ctrl bus
-    signal ctrl_address  : std_logic_vector(ctrl_address_width_c-1 downto 0);
-    signal ctrl_data_in  : std_logic_vector(ctrl_data_width_c-1 downto 0);
-    signal ctrl_data_out : std_logic_vector(ctrl_data_width_c-1 downto 0);
-    signal ctrl_strobe   : std_logic;
-    signal ctrl_write    : std_logic;
-    signal ctrl_ack      : std_logic;
+    signal ctrl_address    : std_logic_vector(ctrl_address_width_c-1 downto 0);
+    signal ctrl_data_in    : std_logic_vector(ctrl_data_width_c-1 downto 0);
+    signal ctrl_data_out   : std_logic_vector(ctrl_data_width_c-1 downto 0);
+    signal ctrl_burst_size : std_logic_vector(log2ceil(ctrl_max_burst_size_c)-1 downto 0);
+    signal ctrl_strobe     : std_logic;
+    signal ctrl_write      : std_logic;
+    signal ctrl_ack        : std_logic;
 
     -- ctrl interconnect
     signal slave_address         : std_logic_array(number_of_slaves_c-1 downto 0, ctrl_address_width_c-1 downto 0);
@@ -413,27 +420,29 @@ begin
         ip_address_g         => ip_address_c,
         ctrl_port_g          => ctrl_port_c,
         ctrl_address_width_g => ctrl_address_width_c,
-        ctrl_data_width_g    => ctrl_data_width_c)
+        ctrl_data_width_g    => ctrl_data_width_c,
+        ctrl_burst_size_g    => ctrl_max_burst_size_c)
     port map (
-        clk_i          => clk_pll_50,
-        reset_i        => reset,
+        clk_i             => clk_pll_50,
+        reset_i           => reset,
         -- mac rx
-        mac_valid_i    => mac_rx_valid,
-        mac_ready_o    => mac_rx_ready,
-        mac_last_i     => mac_rx_last,
-        mac_data_i     => mac_rx_data,
+        mac_valid_i       => mac_rx_valid,
+        mac_ready_o       => mac_rx_ready,
+        mac_last_i        => mac_rx_last,
+        mac_data_i        => mac_rx_data,
         -- mac tx
-        mac_valid_o    => mac_tx_valid,
-        mac_ready_i    => mac_tx_ready,
-        mac_last_o     => mac_tx_last,
-        mac_data_o     => mac_tx_data,
+        mac_valid_o       => mac_tx_valid,
+        mac_ready_i       => mac_tx_ready,
+        mac_last_o        => mac_tx_last,
+        mac_data_o        => mac_tx_data,
         -- ctrl
-        ctrl_address_o => ctrl_address,
-        ctrl_data_o    => ctrl_data_out,
-        ctrl_data_i    => ctrl_data_in,
-        ctrl_strobe_o  => ctrl_strobe,
-        ctrl_write_o   => ctrl_write,
-        ctrl_ack_i     => ctrl_ack);
+        ctrl_address_o    => ctrl_address,
+        ctrl_data_o       => ctrl_data_out,
+        ctrl_data_i       => ctrl_data_in,
+        ctrl_burst_size_o => ctrl_burst_size,
+        ctrl_strobe_o     => ctrl_strobe,
+        ctrl_write_o      => ctrl_write,
+        ctrl_ack_i        => ctrl_ack);
 
     i_interconnect : interconnect
     generic map (
@@ -448,7 +457,7 @@ begin
         master_address_i    => ctrl_address,
         master_data_i       => ctrl_data_out,
         master_data_o       => ctrl_data_in,
-        master_burst_size_i => "00000",
+        master_burst_size_i => ctrl_burst_size,
         master_strobe_i     => ctrl_strobe,
         master_write_i      => ctrl_write,
         master_ack_o        => ctrl_ack,
@@ -480,48 +489,52 @@ begin
         register_mask_g  => register_mask_c,
         read_only_g      => register_read_only_c,
         data_width_g     => ctrl_data_width_c,
-        address_width_g  => ctrl_address_width_c-6)
+        address_width_g  => ctrl_address_width_c-6,
+        burst_size_g     => ctrl_max_burst_size_c)
     port map (
-        clk_i          => clk_pll_50,
-        reset_i        => reset,
+        clk_i             => clk_pll_50,
+        reset_i           => reset,
         -- register
-        data_i         => register_read_data,
-        data_strb_i    => register_read_strb,
-        data_o         => register_write_data,
-        data_strb_o    => register_write_strb,
-        read_strb_o    => register_was_read,
+        data_i            => register_read_data,
+        data_strb_i       => register_read_strb,
+        data_o            => register_write_data,
+        data_strb_o       => register_write_strb,
+        read_strb_o       => register_was_read,
         -- ctrl bus
-        ctrl_address_i => array_extract(slave_registerbank_c, slave_address)(ctrl_address_width_c-5 downto 2),
-        ctrl_data_i    => array_extract(slave_registerbank_c ,slave_write_data),
-        ctrl_data_o    => registerbank_readdata,
-        ctrl_strobe_i  => slave_strobe(slave_registerbank_c),
-        ctrl_write_i   => slave_write(slave_registerbank_c),
-        ctrl_ack_o     => slave_ack(slave_registerbank_c));
+        ctrl_address_i    => array_extract(slave_registerbank_c, slave_address)(ctrl_address_width_c-5 downto 2),
+        ctrl_data_i       => array_extract(slave_registerbank_c, slave_write_data),
+        ctrl_data_o       => registerbank_readdata,
+        ctrl_burst_size_i => array_extract(slave_registerbank_c, slave_burst_size),
+        ctrl_strobe_i     => slave_strobe(slave_registerbank_c),
+        ctrl_write_i      => slave_write(slave_registerbank_c),
+        ctrl_ack_o        => slave_ack(slave_registerbank_c));
 
     i_i2c_master : i2c_master
     generic map (
-        freq_in_g  => main_clock_frequency_c,
-        freq_out_g => i2c_clock_frequency_c)
+        freq_in_g    => main_clock_frequency_c,
+        freq_out_g   => i2c_clock_frequency_c,
+        burst_size_g => ctrl_max_burst_size_c)
     port map (
-        clk_i     => clk_pll_50,
-        reset_i   => reset,
-        scl_o     => i2c_scl,
-        sda_i     => i2c_sda_io,
-        sda_o     => i2c_sda,
+        clk_i        => clk_pll_50,
+        reset_i      => reset,
+        scl_o        => i2c_scl,
+        sda_i        => i2c_sda_io,
+        sda_o        => i2c_sda,
         -- ctrl bus
-        address_i => array_extract(slave_i2c_master_c, slave_address)(9 downto 0),
-        data_i    => array_extract(slave_i2c_master_c ,slave_write_data),
-        data_o    => i2c_master_readdata,
-        strobe_i  => slave_strobe(slave_i2c_master_c),
-        write_i   => slave_write(slave_i2c_master_c),
-        ack_o     => slave_ack(slave_i2c_master_c));
+        address_i    => array_extract(slave_i2c_master_c, slave_address)(9 downto 0),
+        data_i       => array_extract(slave_i2c_master_c, slave_write_data),
+        data_o       => i2c_master_readdata,
+        burst_size_i => array_extract(slave_i2c_master_c, slave_burst_size),
+        strobe_i     => slave_strobe(slave_i2c_master_c),
+        write_i      => slave_write(slave_i2c_master_c),
+        ack_o        => slave_ack(slave_i2c_master_c));
 
     i_hyper_ram : hyper_ram_controller
     generic map (
         clock_period_ns_g      => 20,
         config0_register_g     => x"8FEC",
         latency_cycles_g       => 6,
-        max_burst_size_g       => 32,
+        max_burst_size_g       => ctrl_max_burst_size_c,
         data_width_g           => ctrl_data_width_c,
         row_address_width_g    => 13,
         column_address_width_g => 9)
@@ -543,20 +556,20 @@ begin
         hyper_data_io(6)  => ram_d6_io,
         hyper_data_io(7)  => ram_d7_io,
         -- ctrl bus
-        ctrl_address_i => array_extract(slave_hyper_ram_c, slave_address)(22 downto 1),
-        ctrl_data_i    => array_extract(slave_hyper_ram_c ,slave_write_data),
-        ctrl_data_o    => hyper_ram_readdata,
-        ctrl_burst_size_i => "00000",
-        ctrl_strobe_i  => slave_strobe(slave_hyper_ram_c),
-        ctrl_write_i   => slave_write(slave_hyper_ram_c),
-        ctrl_ack_o     => slave_ack(slave_hyper_ram_c));
+        ctrl_address_i    => array_extract(slave_hyper_ram_c, slave_address)(22 downto 1),
+        ctrl_data_i       => array_extract(slave_hyper_ram_c ,slave_write_data),
+        ctrl_data_o       => hyper_ram_readdata,
+        ctrl_burst_size_i => array_extract(slave_hyper_ram_c, slave_burst_size),
+        ctrl_strobe_i     => slave_strobe(slave_hyper_ram_c),
+        ctrl_write_i      => slave_write(slave_hyper_ram_c),
+        ctrl_ack_o        => slave_ack(slave_hyper_ram_c));
 
     i_lcd : lcd_controller
     generic map (
         buffer_address_g         => x"00000000",
         ctrl_data_width_g        => 32,
         ctrl_address_width_g     => 32,
-        ctrl_max_burst_size_g    => 32,
+        ctrl_max_burst_size_g    => ctrl_max_burst_size_c,
         framebuffer_count_g      => 3,
         color_bits_g             => 4,
         image_width_g            => 320,

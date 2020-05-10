@@ -3,6 +3,7 @@
 -- Date      : 31.12.2019
 -- Filename  : i2c_master.vhd
 -- Changelog : 31.12.2019 - file created
+--             10.05.2020 - burst added
 --------------------------------------------------------------------------------
 
 library ieee;
@@ -14,21 +15,23 @@ use work.fpga_pkg.all;
 
 entity i2c_master is
 generic (
-    freq_in_g  : positive := 50000000;
-    freq_out_g : positive := 100000);
+    freq_in_g    : positive := 50000000;
+    freq_out_g   : positive := 100000;
+    burst_size_g : positive := 32);
 port (
-    clk_i     : in  std_logic;
-    reset_i   : in  std_logic;
-    scl_o     : out std_logic;
-    sda_i     : in  std_logic;
-    sda_o     : out std_logic;
+    clk_i        : in  std_logic;
+    reset_i      : in  std_logic;
+    scl_o        : out std_logic;
+    sda_i        : in  std_logic;
+    sda_o        : out std_logic;
     -- ctrl bus
-    address_i : in  std_logic_vector(9 downto 0);
-    data_i    : in  std_logic_vector(31 downto 0);
-    data_o    : out std_logic_vector(31 downto 0);
-    strobe_i  : in  std_logic;
-    write_i   : in  std_logic;
-    ack_o     : out std_logic);
+    address_i    : in  std_logic_vector(9 downto 0);
+    data_i       : in  std_logic_vector(31 downto 0);
+    data_o       : out std_logic_vector(31 downto 0);
+    burst_size_i : in  std_logic_vector(log2ceil(burst_size_g)-1 downto 0);
+    strobe_i     : in  std_logic;
+    write_i      : in  std_logic;
+    ack_o        : out std_logic);
 end entity i2c_master;
 
 architecture rtl of i2c_master is

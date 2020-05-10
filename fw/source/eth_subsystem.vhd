@@ -6,11 +6,15 @@
 --             17.11.2018 - arp table removed
 --             24.12.2018 - udp added
 --             29.12.2018 - ctrl added
+--             10.05.2020 - burst added
 --------------------------------------------------------------------------------
 
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
+
+library work;
+use work.fpga_pkg.all;
 
 entity eth_subsystem is
 generic (
@@ -18,7 +22,8 @@ generic (
     ip_address_g         : std_logic_vector(31 downto 0) := x"01020304";
     ctrl_port_g          : std_logic_vector(15 downto 0) := x"0102";
     ctrl_address_width_g : positive := 16;
-    ctrl_data_width_g    : positive := 32);
+    ctrl_data_width_g    : positive := 32;
+    ctrl_burst_size_g    : positive := 32);
 port (
     clk_i          : in  std_logic;
     reset_i        : in  std_logic;
@@ -36,6 +41,7 @@ port (
     ctrl_address_o : out std_logic_vector(ctrl_address_width_g-1 downto 0);
     ctrl_data_o    : out std_logic_vector(ctrl_data_width_g-1 downto 0);
     ctrl_data_i    : in  std_logic_vector(ctrl_data_width_g-1 downto 0);
+    ctrl_burst_size_o : out std_logic_vector(log2ceil(ctrl_burst_size_g)-1 downto 0);
     ctrl_strobe_o  : out std_logic;
     ctrl_write_o   : out std_logic;
     ctrl_ack_i     : in  std_logic);
@@ -185,88 +191,91 @@ architecture rtl of eth_subsystem is
     component eth_ctrl is
     generic (
         address_width_g : positive;
-        data_width_g    : positive);
+        data_width_g    : positive;
+        burst_size_g    : positive);
     port (
-        clk_i       : in  std_logic;
-        reset_i     : in  std_logic;
+        clk_i        : in  std_logic;
+        reset_i      : in  std_logic;
         -- udp tx
-        udp_valid_o : out std_logic;
-        udp_ready_i : in  std_logic;
-        udp_last_o  : out std_logic;
-        udp_data_o  : out std_logic_vector(7 downto 0);
+        udp_valid_o  : out std_logic;
+        udp_ready_i  : in  std_logic;
+        udp_last_o   : out std_logic;
+        udp_data_o   : out std_logic_vector(7 downto 0);
         -- udp rx
-        udp_valid_i : in  std_logic;
-        udp_ready_o : out std_logic;
-        udp_last_i  : in  std_logic;
-        udp_data_i  : in  std_logic_vector(7 downto 0);
+        udp_valid_i  : in  std_logic;
+        udp_ready_o  : out std_logic;
+        udp_last_i   : in  std_logic;
+        udp_data_i   : in  std_logic_vector(7 downto 0);
         -- ctrl bus
-        address_o   : out std_logic_vector(address_width_g-1 downto 0);
-        data_o      : out std_logic_vector(data_width_g-1 downto 0);
-        data_i      : in  std_logic_vector(data_width_g-1 downto 0);
-        strobe_o    : out std_logic;
-        write_o     : out std_logic;
-        ack_i       : in  std_logic);
+        address_o    : out std_logic_vector(address_width_g-1 downto 0);
+        data_o       : out std_logic_vector(data_width_g-1 downto 0);
+        data_i       : in  std_logic_vector(data_width_g-1 downto 0);
+        burst_size_o : out std_logic_vector(log2ceil(burst_size_g)-1 downto 0);
+        strobe_o     : out std_logic;
+        write_o      : out std_logic;
+        ack_i        : in  std_logic);
     end component eth_ctrl;
 
-    signal arp_rx_valid  : std_logic;
-    signal arp_rx_ready  : std_logic;
-    signal arp_rx_last   : std_logic;
-    signal arp_rx_data   : std_logic_vector(7 downto 0);
+    signal arp_rx_valid    : std_logic;
+    signal arp_rx_ready    : std_logic;
+    signal arp_rx_last     : std_logic;
+    signal arp_rx_data     : std_logic_vector(7 downto 0);
 
-    signal arp_tx_valid  : std_logic;
-    signal arp_tx_ready  : std_logic;
-    signal arp_tx_last   : std_logic;
-    signal arp_tx_data   : std_logic_vector(7 downto 0);
+    signal arp_tx_valid    : std_logic;
+    signal arp_tx_ready    : std_logic;
+    signal arp_tx_last     : std_logic;
+    signal arp_tx_data     : std_logic_vector(7 downto 0);
 
-    signal ip_rx_valid   : std_logic;
-    signal ip_rx_ready   : std_logic;
-    signal ip_rx_last    : std_logic;
-    signal ip_rx_data    : std_logic_vector(7 downto 0);
+    signal ip_rx_valid     : std_logic;
+    signal ip_rx_ready     : std_logic;
+    signal ip_rx_last      : std_logic;
+    signal ip_rx_data      : std_logic_vector(7 downto 0);
 
-    signal udp_rx_valid  : std_logic;
-    signal udp_rx_ready  : std_logic;
-    signal udp_rx_last   : std_logic;
-    signal udp_rx_data   : std_logic_vector(7 downto 0);
+    signal udp_rx_valid    : std_logic;
+    signal udp_rx_ready    : std_logic;
+    signal udp_rx_last     : std_logic;
+    signal udp_rx_data     : std_logic_vector(7 downto 0);
 
-    signal ctrl_rx_valid : std_logic;
-    signal ctrl_rx_ready : std_logic;
-    signal ctrl_rx_last  : std_logic;
-    signal ctrl_rx_data  : std_logic_vector(7 downto 0);
+    signal ctrl_rx_valid   : std_logic;
+    signal ctrl_rx_ready   : std_logic;
+    signal ctrl_rx_last    : std_logic;
+    signal ctrl_rx_data    : std_logic_vector(7 downto 0);
 
-    signal ctrl_tx_valid : std_logic;
-    signal ctrl_tx_ready : std_logic;
-    signal ctrl_tx_last  : std_logic;
-    signal ctrl_tx_data  : std_logic_vector(7 downto 0);
+    signal ctrl_tx_valid   : std_logic;
+    signal ctrl_tx_ready   : std_logic;
+    signal ctrl_tx_last    : std_logic;
+    signal ctrl_tx_data    : std_logic_vector(7 downto 0);
 
-    signal udp_tx_valid  : std_logic;
-    signal udp_tx_ready  : std_logic;
-    signal udp_tx_last   : std_logic;
-    signal udp_tx_data   : std_logic_vector(7 downto 0);
+    signal udp_tx_valid    : std_logic;
+    signal udp_tx_ready    : std_logic;
+    signal udp_tx_last     : std_logic;
+    signal udp_tx_data     : std_logic_vector(7 downto 0);
 
-    signal ip_tx_valid   : std_logic;
-    signal ip_tx_ready   : std_logic;
-    signal ip_tx_last    : std_logic;
-    signal ip_tx_data    : std_logic_vector(7 downto 0);
+    signal ip_tx_valid     : std_logic;
+    signal ip_tx_ready     : std_logic;
+    signal ip_tx_last      : std_logic;
+    signal ip_tx_data      : std_logic_vector(7 downto 0);
 
-    signal icmp_rx_valid : std_logic;
-    signal icmp_rx_ready : std_logic;
-    signal icmp_rx_last  : std_logic;
-    signal icmp_rx_data  : std_logic_vector(7 downto 0);
+    signal icmp_rx_valid   : std_logic;
+    signal icmp_rx_ready   : std_logic;
+    signal icmp_rx_last    : std_logic;
+    signal icmp_rx_data    : std_logic_vector(7 downto 0);
 
-    signal icmp_tx_valid : std_logic;
-    signal icmp_tx_ready : std_logic;
-    signal icmp_tx_last  : std_logic;
-    signal icmp_tx_data  : std_logic_vector(7 downto 0);
+    signal icmp_tx_valid   : std_logic;
+    signal icmp_tx_ready   : std_logic;
+    signal icmp_tx_last    : std_logic;
+    signal icmp_tx_data    : std_logic_vector(7 downto 0);
 
-    signal mac_ready     : std_logic;
-    signal mac_valid     : std_logic;
-    signal mac_last      : std_logic;
-    signal mac_data      : std_logic_vector(7 downto 0);
+    signal mac_ready       : std_logic;
+    signal mac_valid       : std_logic;
+    signal mac_last        : std_logic;
+    signal mac_data        : std_logic_vector(7 downto 0);
 
-    signal ctrl_address : std_logic_vector(ctrl_address_width_g-1 downto 0);
-    signal ctrl_data    : std_logic_vector(ctrl_data_width_g-1 downto 0);
-    signal ctrl_strobe  : std_logic;
-    signal ctrl_write   : std_logic;
+    signal ctrl_address    : std_logic_vector(ctrl_address_width_g-1 downto 0);
+    signal ctrl_data       : std_logic_vector(ctrl_data_width_g-1 downto 0);
+    signal ctrl_burst_size : std_logic_vector(log2ceil(ctrl_burst_size_g)-1 downto 0);
+    signal ctrl_strobe     : std_logic;
+    signal ctrl_write      : std_logic;
 
 begin
 
@@ -407,27 +416,29 @@ begin
     i_ctrl : eth_ctrl
     generic map (
         address_width_g => ctrl_address_width_g,
-        data_width_g    => ctrl_data_width_g)
+        data_width_g    => ctrl_data_width_g,
+        burst_size_g    => ctrl_burst_size_g)
     port map (
-        clk_i       => clk_i,
-        reset_i     => reset_i,
+        clk_i        => clk_i,
+        reset_i      => reset_i,
         -- udp tx
-        udp_valid_o => ctrl_tx_valid,
-        udp_ready_i => ctrl_tx_ready,
-        udp_last_o  => ctrl_tx_last,
-        udp_data_o  => ctrl_tx_data,
+        udp_valid_o  => ctrl_tx_valid,
+        udp_ready_i  => ctrl_tx_ready,
+        udp_last_o   => ctrl_tx_last,
+        udp_data_o   => ctrl_tx_data,
         -- udp rx
-        udp_valid_i => ctrl_rx_valid,
-        udp_ready_o => ctrl_rx_ready,
-        udp_last_i  => ctrl_rx_last,
-        udp_data_i  => ctrl_rx_data,
+        udp_valid_i  => ctrl_rx_valid,
+        udp_ready_o  => ctrl_rx_ready,
+        udp_last_i   => ctrl_rx_last,
+        udp_data_i   => ctrl_rx_data,
         -- ctrl bus
-        address_o   => ctrl_address,
-        data_o      => ctrl_data,
-        data_i      => ctrl_data_i,
-        strobe_o    => ctrl_strobe,
-        write_o     => ctrl_write,
-        ack_i       => ctrl_ack_i);
+        address_o    => ctrl_address,
+        data_o       => ctrl_data,
+        data_i       => ctrl_data_i,
+        burst_size_o => ctrl_burst_size,
+        strobe_o     => ctrl_strobe,
+        write_o      => ctrl_write,
+        ack_i        => ctrl_ack_i);
 
     mac_ready_o <= mac_ready;
     mac_valid_o <= mac_valid;
@@ -436,6 +447,7 @@ begin
 
     ctrl_address_o <= ctrl_address;
     ctrl_data_o <= ctrl_data;
+    ctrl_burst_size_o <= ctrl_burst_size;
     ctrl_strobe_o <= ctrl_strobe;
     ctrl_write_o <= ctrl_write;
 

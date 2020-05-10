@@ -3,6 +3,7 @@
 -- Date      : 30.12.2019
 -- Filename  : hyper_ram_controller.vhd
 -- Changelog : 30.12.2019 - file created
+--             10.05.2020 - write data fifo added
 --------------------------------------------------------------------------------
 
 library ieee;
@@ -46,6 +47,28 @@ end entity hyper_ram_controller;
 
 architecture rtl of hyper_ram_controller is
 
+    component fifo is
+    generic (
+        size_exp_g     : positive;
+        data_width_g   : positive;
+        use_reject_g   : boolean;
+        invert_full_g  : boolean;
+        invert_empty_g : boolean);
+    port (
+        clk_i    : in  std_logic;
+        reset_i  : in  std_logic;
+        -- write port
+        data_i   : in  std_logic_vector(data_width_g-1 downto 0);
+        wr_i     : in  std_logic;
+        store_i  : in  std_logic;
+        reject_i : in  std_logic;
+        full_o   : out std_logic;
+        -- read port
+        data_o   : out std_logic_vector(data_width_g-1 downto 0);
+        rd_i     : in  std_logic;
+        empty_o  : out std_logic);
+    end component fifo;
+
     constant power_up_wait_cycles_c : positive := 200000/clock_period_ns_g;
     constant ca_read_sel_c          : natural := 47;
     constant ca_space_sel_c         : natural := 46;
@@ -55,23 +78,28 @@ architecture rtl of hyper_ram_controller is
 
     type fsm_t is (idle_s, start_s, init_s, address_s, wait_s, read_s, write_s);
 
-    signal fsm_r               : fsm_t := idle_s;
-    signal init_done_r         : std_logic := '0';
-    signal init_counter_r      : unsigned(log2ceil(power_up_wait_cycles_c+1)-1 downto 0) := to_unsigned(power_up_wait_cycles_c, log2ceil(power_up_wait_cycles_c+1));
-    signal data_r              : std_logic_vector(data_width_g-1 downto 0) := (others => '0');
-    signal data_read_r         : std_logic_vector(data_width_g-1 downto 0) := (others => '0');
-    signal data_ack_r          : std_logic := '0';
-    signal data_halfword_sel_r : std_logic := '0';
-    signal burst_counter_r     : unsigned(log2ceil(max_burst_size_g)-1 downto 0) := (others => '0');
-    signal ca_r                : std_logic_vector(47 downto 0) := (others => '0');
-    signal ca_counter_r        : unsigned(1 downto 0) := (others => '0');
-    signal latency_counter_r   : unsigned(log2ceil(latency_cycles_g)-1 downto 0) := to_unsigned(latency_cycles_g-2, log2ceil(latency_cycles_g));
-    signal read_request_r      : std_logic := '0';
-    signal write_request_r     : std_logic := '0';
-    signal address_r           : std_logic_vector(row_address_width_g+column_address_width_g-1 downto 0) := (others => '0');
-    signal burst_size_r        : std_logic_vector(ctrl_burst_size_i'range) := (others => '0');
-    signal first_data_r        : std_logic_vector(data_width_g-1 downto 0) := (others => '0');
-    signal in_progress_r       : std_logic := '0';
+    signal fsm_r                   : fsm_t := idle_s;
+    signal init_done_r             : std_logic := '0';
+    signal init_counter_r          : unsigned(log2ceil(power_up_wait_cycles_c+1)-1 downto 0) := to_unsigned(power_up_wait_cycles_c, log2ceil(power_up_wait_cycles_c+1));
+    signal data_r                  : std_logic_vector(data_width_g-1 downto 0) := (others => '0');
+    signal data_read_r             : std_logic_vector(data_width_g-1 downto 0) := (others => '0');
+    signal data_ack_r              : std_logic := '0';
+    signal data_halfword_sel_r     : std_logic := '0';
+    signal burst_counter_r         : unsigned(log2ceil(max_burst_size_g)-1 downto 0) := (others => '0');
+    signal ca_r                    : std_logic_vector(47 downto 0) := (others => '0');
+    signal ca_counter_r            : unsigned(1 downto 0) := (others => '0');
+    signal latency_counter_r       : unsigned(log2ceil(latency_cycles_g)-1 downto 0) := to_unsigned(latency_cycles_g-2, log2ceil(latency_cycles_g));
+    signal read_request_r          : std_logic := '0';
+    signal write_request_r         : std_logic := '0';
+    signal address_r               : std_logic_vector(row_address_width_g+column_address_width_g-1 downto 0) := (others => '0');
+    signal burst_size_r            : std_logic_vector(ctrl_burst_size_i'range) := (others => '0');
+    signal in_progress_r           : std_logic := '0';
+    signal fifo_data               : std_logic_vector(data_width_g-1 downto 0);
+    signal fifo_read_r             : std_logic := '0';
+    signal fifo_data_available     : std_logic;
+    signal fifo_write_data_ready_r : std_logic := '0';
+    signal fifo_data_counter_r     : unsigned(log2ceil(max_burst_size_g) downto 0) := (others => '0');
+    signal done_r                  : std_logic := '0';
 
     signal hyper_clk_en_r        : std_logic := '0';
     signal hyper_clk_en_delay_r  : std_logic := '0';
@@ -93,34 +121,73 @@ architecture rtl of hyper_ram_controller is
 
 begin
 
+    i_fifo : fifo
+    generic map (
+        size_exp_g     => 8,
+        data_width_g   => data_width_g,
+        use_reject_g   => false,
+        invert_full_g  => false,
+        invert_empty_g => true)
+    port map (
+        clk_i    => clk_i,
+        reset_i  => reset_i,
+        -- write port
+        data_i   => ctrl_data_i,
+        wr_i     => ctrl_strobe_i,
+        store_i  => '0',
+        reject_i => '0',
+        full_o   => open,
+        -- read port
+        data_o   => fifo_data,
+        rd_i     => fifo_read_r,
+        empty_o  => fifo_data_available);
+
     input_proc : process (clk_i)
     begin
         if (rising_edge(clk_i)) then
-            if (ctrl_strobe_i = '1') then
+            if ((ctrl_strobe_i = '1') and (in_progress_r = '0')) then
                 address_r <= ctrl_address_i;
                 burst_size_r <= ctrl_burst_size_i;
-                first_data_r <= ctrl_data_i;
                 if (ctrl_write_i = '1') then
                     write_request_r <= '1';
                 else
                     read_request_r <= '1';
                 end if;
             end if;
-            if ((reset_i = '1') or (data_ack_r = '1')) then
+            -- clear request flags after first write word or read command was removed from fifo
+            if ((reset_i = '1') or (fifo_read_r = '1')) then
                 read_request_r <= '0';
                 write_request_r <= '0';
             end if;
         end if;
     end process input_proc;
 
+    write_data_counter_proc : process (clk_i)
+    begin
+        if (rising_edge(clk_i)) then
+            if ((reset_i = '1') or (done_r = '1')) then
+                fifo_data_counter_r <= (others => '0');
+            elsif (ctrl_strobe_i = '1') then
+                fifo_data_counter_r <= fifo_data_counter_r + 1;
+            end if;
+            if ((reset_i = '1') or (done_r = '1')) then
+                fifo_write_data_ready_r <= '0';
+            elsif ((fifo_data_counter_r = (resize(unsigned(burst_size_r), fifo_data_counter_r'length) + 1)) and (write_request_r = '1')) then
+                fifo_write_data_ready_r <= '1';
+            end if;
+        end if;
+    end process write_data_counter_proc;
+
     fsm_proc : process (clk_i)
     begin
         if (rising_edge(clk_i)) then
             data_ack_r <= '0';
+            fifo_read_r <= '0';
             hyper_data_in_counter_reset_r <= '0';
+            done_r <= '0';
+
             case (fsm_r) is
                 when idle_s =>
-                    in_progress_r <= '0';
                     hyper_rwds_en_r <= '0';
                     hyper_data_en_r <= '0';
                     hyper_cs_en_r <= '0';
@@ -129,7 +196,7 @@ begin
                     latency_counter_r <= to_unsigned(latency_cycles_g-2, latency_counter_r'length);
                     if (init_done_r = '0') then
                         fsm_r <= init_s;
-                    elsif (((read_request_r = '1') or (write_request_r = '1')) and (in_progress_r = '0')) then
+                    elsif ((read_request_r = '1') or (write_request_r = '1')) then
                         in_progress_r <= '1';
                         fsm_r <= start_s;
                     end if;
@@ -141,11 +208,12 @@ begin
                     ca_r(ca_upper_address_range_c) <= std_logic_vector(resize(unsigned(address_r(address_r'high downto 3)), 29));
                     ca_r(ca_lower_address_range_c) <= address_r(2 downto 0);
                     burst_counter_r <= unsigned(burst_size_r);
-                    if (write_request_r = '1') then
-                        data_r <= first_data_r;
-                    end if;
+                    data_r <= fifo_data;
                     ca_counter_r <= (others => '0');
-                    fsm_r <= address_s;
+                    if ((fifo_data_available = '1') and ((write_request_r xor fifo_write_data_ready_r) = '0')) then
+                        fifo_read_r <= '1';
+                        fsm_r <= address_s;
+                    end if;
 
                 when init_s =>
                     ca_r(ca_read_sel_c) <= '0';
@@ -189,7 +257,6 @@ begin
                     -- wait until initial latency has passed
                     if (vector_or(std_logic_vector(latency_counter_r)) = '0') then
                         if (ca_r(ca_read_sel_c) = '0') then
-                            data_ack_r <= '1';
                             fsm_r <= write_s;
                         else
                             fsm_r <= read_s;
@@ -204,6 +271,8 @@ begin
                         if (hyper_data_in_counter_cc_r(hyper_data_in_counter_cc_r'high downto 1) = unsigned(burst_size_r)) then
                             hyper_cs_en_r <= '0';
                             hyper_clk_en_r <= '0';
+                            done_r <= '1';
+                            in_progress_r <= '0';
                             fsm_r <= idle_s;
                         end if;
                         data_ack_r <= '1';
@@ -213,24 +282,24 @@ begin
                     hyper_data_en_r <= '1';
                     hyper_data_out_r <= data_r(7 downto 0) & data_r(15 downto 8);
                     data_halfword_sel_r <= not data_halfword_sel_r;
-                    -- strobe signal is ignored but data is expected to be valid after each ack
                     if (data_halfword_sel_r = '0') then
                         data_r <= x"0000" & data_r(31 downto 16);
                     else
-                        data_r <= ctrl_data_i;
+                        data_r <= fifo_data;
+                        fifo_read_r <= '1';
                         burst_counter_r <= burst_counter_r - 1;
                     end if;
                     if (init_done_r = '0') then
                         -- transfer only 2 bytes to write configuration 0 register
                         init_done_r <= '1';
+                        in_progress_r <= '0';
                         fsm_r <= idle_s;
                     else
-                        if (vector_or(std_logic_vector(burst_counter_r)) = '0') then
-                            if (data_halfword_sel_r = '1') then
-                                fsm_r <= idle_s;
-                            end if;
-                        else
-                            data_ack_r <= data_halfword_sel_r;
+                        if ((vector_or(std_logic_vector(burst_counter_r)) = '0') and (data_halfword_sel_r = '1')) then
+                            done_r <= '1';
+                            data_ack_r <= '1';
+                            in_progress_r <= '0';
+                            fsm_r <= idle_s;
                         end if;
                         hyper_rwds_en_r <= '1';
                     end if;

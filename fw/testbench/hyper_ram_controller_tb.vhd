@@ -190,7 +190,6 @@ begin
         ctrl_data_w <= x"DEADBEEF";
         ctrl_write <= '0';
         ctrl_strobe <= '0';
-        wait until ctrl_ack = '1';
         wait until rising_edge(clk);
         ctrl_data_w <= x"ABCDEF01";
         ctrl_strobe <= '1';

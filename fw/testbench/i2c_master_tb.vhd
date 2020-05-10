@@ -20,33 +20,36 @@ architecture rtl of i2c_master_tb is
     component eth_ctrl is
     generic (
         address_width_g : positive;
-        data_width_g    : positive);
+        data_width_g    : positive;
+        burst_size_g    : positive);
     port (
-        clk_i       : in  std_logic;
-        reset_i     : in  std_logic;
+        clk_i        : in  std_logic;
+        reset_i      : in  std_logic;
         -- udp tx
-        udp_valid_o : out std_logic;
-        udp_ready_i : in  std_logic;
-        udp_last_o  : out std_logic;
-        udp_data_o  : out std_logic_vector(7 downto 0);
+        udp_valid_o  : out std_logic;
+        udp_ready_i  : in  std_logic;
+        udp_last_o   : out std_logic;
+        udp_data_o   : out std_logic_vector(7 downto 0);
         -- udp rx
-        udp_valid_i : in  std_logic;
-        udp_ready_o : out std_logic;
-        udp_last_i  : in  std_logic;
-        udp_data_i  : in  std_logic_vector(7 downto 0);
+        udp_valid_i  : in  std_logic;
+        udp_ready_o  : out std_logic;
+        udp_last_i   : in  std_logic;
+        udp_data_i   : in  std_logic_vector(7 downto 0);
         -- ctrl bus
-        address_o   : out std_logic_vector(address_width_g-1 downto 0);
-        data_o      : out std_logic_vector(data_width_g-1 downto 0);
-        data_i      : in  std_logic_vector(data_width_g-1 downto 0);
-        strobe_o    : out std_logic;
-        write_o     : out std_logic;
-        ack_i       : in  std_logic);
+        address_o    : out std_logic_vector(address_width_g-1 downto 0);
+        data_o       : out std_logic_vector(data_width_g-1 downto 0);
+        data_i       : in  std_logic_vector(data_width_g-1 downto 0);
+        burst_size_o : out std_logic_vector(log2ceil(burst_size_g)-1 downto 0);
+        strobe_o     : out std_logic;
+        write_o      : out std_logic;
+        ack_i        : in  std_logic);
     end component eth_ctrl;
 
     component i2c_master is
     generic (
-        freq_in_g       : positive;
-        freq_out_g      : positive);
+        freq_in_g    : positive;
+        freq_out_g   : positive;
+        burst_size_g : positive);
     port (
         clk_i   : in  std_logic;
         reset_i : in  std_logic;
@@ -54,12 +57,13 @@ architecture rtl of i2c_master_tb is
         sda_i   : in  std_logic;
         sda_o   : out std_logic;
         -- ctrl bus
-        address_i   : in  std_logic_vector(9 downto 0);
-        data_i      : in  std_logic_vector(31 downto 0);
-        data_o      : out std_logic_vector(31 downto 0);
-        strobe_i    : in  std_logic;
-        write_i     : in  std_logic;
-        ack_o       : out std_logic);
+        address_i    : in  std_logic_vector(9 downto 0);
+        data_i       : in  std_logic_vector(31 downto 0);
+        data_o       : out std_logic_vector(31 downto 0);
+        burst_size_i : in  std_logic_vector(log2ceil(burst_size_g)-1 downto 0);
+        strobe_i     : in  std_logic;
+        write_i      : in  std_logic;
+        ack_o        : out std_logic);
     end component i2c_master;
 
     component i2c_slave is
@@ -96,6 +100,7 @@ architecture rtl of i2c_master_tb is
 
     constant address_width_c  : positive := 16;
     constant data_width_c     : positive := 32;
+    constant burst_size_c     : positive := 32;
     constant i2c_slave_addr_c : std_logic_vector(7 downto 0) := x"34";
 
     constant command_read_c          : std_logic_vector(7 downto 0) := x"01";
@@ -106,12 +111,13 @@ architecture rtl of i2c_master_tb is
     signal clk    : std_logic := '0';
     signal clk_en : boolean := true;
 
-    signal ctrl_address : std_logic_vector(address_width_c-1 downto 0);
-    signal ctrl_data_r  : std_logic_vector(data_width_c-1 downto 0) := (others => '0');
-    signal ctrl_data_w  : std_logic_vector(data_width_c-1 downto 0);
-    signal ctrl_strobe  : std_logic;
-    signal ctrl_write   : std_logic;
-    signal ctrl_ack     : std_logic;
+    signal ctrl_address    : std_logic_vector(address_width_c-1 downto 0);
+    signal ctrl_data_r     : std_logic_vector(data_width_c-1 downto 0) := (others => '0');
+    signal ctrl_data_w     : std_logic_vector(data_width_c-1 downto 0);
+    signal ctrl_burst_size : std_logic_vector(log2ceil(burst_size_c)-1 downto 0);
+    signal ctrl_strobe     : std_logic;
+    signal ctrl_write      : std_logic;
+    signal ctrl_ack        : std_logic;
 
     signal scl_ms : std_logic;
     signal sda_ms : std_logic;
@@ -151,32 +157,35 @@ begin
     i_ctrl : eth_ctrl
     generic map (
         address_width_g => address_width_c,
-        data_width_g    => data_width_c)
+        data_width_g    => data_width_c,
+        burst_size_g    => burst_size_c)
     port map (
-        clk_i       => clk,
-        reset_i     => '0',
+        clk_i        => clk,
+        reset_i      => '0',
         -- udp tx
-        udp_valid_o => udp_tx_valid,
-        udp_ready_i => '1',
-        udp_last_o  => udp_tx_last,
-        udp_data_o  => udp_tx_data,
+        udp_valid_o  => udp_tx_valid,
+        udp_ready_i  => '1',
+        udp_last_o   => udp_tx_last,
+        udp_data_o   => udp_tx_data,
         -- udp rx
-        udp_valid_i => udp_rx_valid_r,
-        udp_ready_o => udp_rx_ready,
-        udp_last_i  => udp_rx_last_r,
-        udp_data_i  => udp_rx_data_r,
+        udp_valid_i  => udp_rx_valid_r,
+        udp_ready_o  => udp_rx_ready,
+        udp_last_i   => udp_rx_last_r,
+        udp_data_i   => udp_rx_data_r,
         -- ctrl bus
-        address_o   => ctrl_address,
-        data_o      => ctrl_data_w,
-        data_i      => ctrl_data_r,
-        strobe_o    => ctrl_strobe,
-        write_o     => ctrl_write,
-        ack_i       => ctrl_ack);
+        address_o    => ctrl_address,
+        data_o       => ctrl_data_w,
+        data_i       => ctrl_data_r,
+        burst_size_o => ctrl_burst_size,
+        strobe_o     => ctrl_strobe,
+        write_o      => ctrl_write,
+        ack_i        => ctrl_ack);
 
     i_i2c_master : i2c_master
     generic map (
-        freq_in_g       => 50000000,
-        freq_out_g      => 100000)
+        freq_in_g    => 50000000,
+        freq_out_g   => 100000,
+        burst_size_g => 32)
     port map (
         clk_i   => clk,
         reset_i => '0',
@@ -184,12 +193,13 @@ begin
         sda_i   => sda_sm,
         sda_o   => sda_ms,
         -- ctrl bus
-        address_i   => ctrl_address(9 downto 0),
-        data_i      => ctrl_data_w,
-        data_o      => ctrl_data_r,
-        strobe_i    => ctrl_strobe,
-        write_i     => ctrl_write,
-        ack_o       => ctrl_ack);
+        address_i    => ctrl_address(9 downto 0),
+        data_i       => ctrl_data_w,
+        data_o       => ctrl_data_r,
+        burst_size_i => ctrl_burst_size,
+        strobe_i     => ctrl_strobe,
+        write_i      => ctrl_write,
+        ack_o        => ctrl_ack);
 
     i_i2c_slave : i2c_slave
     generic map (
@@ -247,7 +257,7 @@ begin
                               signal   ready   : in  std_logic;
                               constant address : in  std_logic_vector(address_width_c-1 downto 0);
                               constant wdata   : in  std_logic_vector(data_width_c-1 downto 0);
-                              constant wlength : in  std_logic_vector(7 downto 0)) is 
+                              constant wlength : in  std_logic_vector(15 downto 0)) is 
         begin
             ctrl_wait_for_signal (ready);
             valid <= '1';
@@ -267,7 +277,9 @@ begin
             ctrl_wait_for_signal (ready);
             data <= address(7 downto 0); -- address lsb
             ctrl_wait_for_signal (ready);
-            data <= wlength; -- data length
+            data <= wlength(15 downto 8); -- data length msb
+            ctrl_wait_for_signal (ready);
+            data <= wlength(7 downto 0); -- data length lsb
             for i in 0 to (to_integer(unsigned(wlength))/4)-1 loop
                 ctrl_wait_for_signal (ready);
                 data <= wdata(31 downto 24); -- data msb
@@ -290,7 +302,7 @@ begin
                              signal   last    : out std_logic;
                              signal   ready   : in  std_logic;
                              constant address : in  std_logic_vector(address_width_c-1 downto 0);
-                             constant rlength : in  std_logic_vector(7 downto 0)) is
+                             constant rlength : in  std_logic_vector(15 downto 0)) is
         begin
             ctrl_wait_for_signal (ready);
             valid <= '1';
@@ -310,7 +322,9 @@ begin
             ctrl_wait_for_signal (ready);
             data <= address(7 downto 0); -- address lsb
             ctrl_wait_for_signal (ready);
-            data <= rlength; -- read length
+            data <= rlength(15 downto 8); -- read length msb
+            ctrl_wait_for_signal (ready);
+            data <= rlength(7 downto 0); -- read length lsb
             last <= '1';
             ctrl_wait_for_signal (ready);
             last <= '0';
@@ -333,7 +347,8 @@ begin
                 end if;
                 rdata := x"00000000";
             else
-                ctrl_wait_for_signal(valid); -- size
+                ctrl_wait_for_signal(valid); -- size msb
+                ctrl_wait_for_signal(valid); -- size lsb
                 ctrl_wait_for_signal(valid);
                 data_v(31 downto 24) := data;
                 ctrl_wait_for_signal(valid);
@@ -359,16 +374,16 @@ begin
         -- write 0x23 to adress 0x01
         address_v := x"01" & i2c_slave_addr_c;
         write_data_v := x"01_230000";
-        ctrl_write(udp_rx_valid_r, udp_rx_data_r, udp_rx_last_r, udp_rx_ready, address_v, write_data_v, x"04");
+        ctrl_write(udp_rx_valid_r, udp_rx_data_r, udp_rx_last_r, udp_rx_ready, address_v, write_data_v, x"0004");
         wait until rising_edge(clk);
 
         -- read address 0x1
         address_v := x"00" & i2c_slave_addr_c;
         write_data_v := x"01_000000";
-        ctrl_write(udp_rx_valid_r, udp_rx_data_r, udp_rx_last_r, udp_rx_ready, address_v, write_data_v, x"04");
+        ctrl_write(udp_rx_valid_r, udp_rx_data_r, udp_rx_last_r, udp_rx_ready, address_v, write_data_v, x"0004");
         wait until rising_edge(clk);
         address_v := x"00" & i2c_slave_addr_c;
-        ctrl_read(udp_rx_valid_r, udp_rx_data_r, udp_rx_last_r, udp_rx_ready, address_v, x"04");
+        ctrl_read(udp_rx_valid_r, udp_rx_data_r, udp_rx_last_r, udp_rx_ready, address_v, x"0004");
         ctrl_wait_for_read_data (udp_tx_valid, udp_tx_data, udp_tx_last, read_data_v);
         debug_data <= read_data_v;
         assert (read_data_v = x"00000023") report "read error" severity error;
@@ -377,16 +392,16 @@ begin
         -- write 0xAABB to adress 0x02 (write 2 bytes)
         address_v := x"02" & i2c_slave_addr_c;
         write_data_v := x"02_AABB00";
-        ctrl_write(udp_rx_valid_r, udp_rx_data_r, udp_rx_last_r, udp_rx_ready, address_v, write_data_v, x"04");
+        ctrl_write(udp_rx_valid_r, udp_rx_data_r, udp_rx_last_r, udp_rx_ready, address_v, write_data_v, x"0004");
         wait until rising_edge(clk);
 
         -- read address 0x2 (read 2 bytes)
         address_v := x"00" & i2c_slave_addr_c;
         write_data_v := x"02_000000";
-        ctrl_write(udp_rx_valid_r, udp_rx_data_r, udp_rx_last_r, udp_rx_ready, address_v, write_data_v, x"04");
+        ctrl_write(udp_rx_valid_r, udp_rx_data_r, udp_rx_last_r, udp_rx_ready, address_v, write_data_v, x"0004");
         wait until rising_edge(clk);
         address_v := x"01" & i2c_slave_addr_c;
-        ctrl_read(udp_rx_valid_r, udp_rx_data_r, udp_rx_last_r, udp_rx_ready, address_v, x"04");
+        ctrl_read(udp_rx_valid_r, udp_rx_data_r, udp_rx_last_r, udp_rx_ready, address_v, x"0004");
         ctrl_wait_for_read_data (udp_tx_valid, udp_tx_data, udp_tx_last, read_data_v);
         debug_data <= read_data_v;
         assert (read_data_v = x"0000AABB") report "read error" severity error;
@@ -395,16 +410,16 @@ begin
         -- write 0x123456 to adress 0x04 (write 3 bytes)
         address_v := x"03" & i2c_slave_addr_c;
         write_data_v := x"04_123456";
-        ctrl_write(udp_rx_valid_r, udp_rx_data_r, udp_rx_last_r, udp_rx_ready, address_v, write_data_v, x"04");
+        ctrl_write(udp_rx_valid_r, udp_rx_data_r, udp_rx_last_r, udp_rx_ready, address_v, write_data_v, x"0004");
         wait until rising_edge(clk);
 
         -- read address 0x4 (read 3 bytes)
         address_v := x"00" & i2c_slave_addr_c;
         write_data_v := x"04_000000";
-        ctrl_write(udp_rx_valid_r, udp_rx_data_r, udp_rx_last_r, udp_rx_ready, address_v, write_data_v, x"04");
+        ctrl_write(udp_rx_valid_r, udp_rx_data_r, udp_rx_last_r, udp_rx_ready, address_v, write_data_v, x"0004");
         wait until rising_edge(clk);
         address_v := x"02" & i2c_slave_addr_c;
-        ctrl_read(udp_rx_valid_r, udp_rx_data_r, udp_rx_last_r, udp_rx_ready, address_v, x"04");
+        ctrl_read(udp_rx_valid_r, udp_rx_data_r, udp_rx_last_r, udp_rx_ready, address_v, x"0004");
         ctrl_wait_for_read_data (udp_tx_valid, udp_tx_data, udp_tx_last, read_data_v);
         debug_data <= read_data_v;
         assert (read_data_v = x"00123456") report "read error" severity error;
@@ -413,10 +428,10 @@ begin
         -- read address 0x1 (read 4 bytes)
         address_v := x"00" & i2c_slave_addr_c;
         write_data_v := x"01_000000";
-        ctrl_write(udp_rx_valid_r, udp_rx_data_r, udp_rx_last_r, udp_rx_ready, address_v, write_data_v, x"04");
+        ctrl_write(udp_rx_valid_r, udp_rx_data_r, udp_rx_last_r, udp_rx_ready, address_v, write_data_v, x"0004");
         wait until rising_edge(clk);
         address_v := x"03" & i2c_slave_addr_c;
-        ctrl_read(udp_rx_valid_r, udp_rx_data_r, udp_rx_last_r, udp_rx_ready, address_v, x"04");
+        ctrl_read(udp_rx_valid_r, udp_rx_data_r, udp_rx_last_r, udp_rx_ready, address_v, x"0004");
         ctrl_wait_for_read_data (udp_tx_valid, udp_tx_data, udp_tx_last, read_data_v);
         debug_data <= read_data_v;
         assert (read_data_v = x"23AABB12") report "read error" severity error;
