@@ -76,8 +76,8 @@ architecture rtl of eth_ctrl is
     type rx_fsm_t is (idle_s, id_s, command_s, addr_size_s, addr_s, data_size_s,
                       write_s, write_ack_s, read_s, wait_for_done_s, wait_for_end_s);
 
-    type tx_fsm_t is (idle_s, packet_nr_s, id_s, command_s,
-                      data_size_s, data_s, last_byte_s, wait_for_next_byte_s);
+    type tx_fsm_t is (idle_s, packet_nr_s, id_s, command_s, data_size_s,
+                      data_s, get_data_s, last_byte_s, wait_for_next_byte_s);
 
     signal rx_fsm_r              : rx_fsm_t := idle_s;
     signal udp_ready_r           : std_logic := '0';
@@ -144,6 +144,7 @@ begin
         if (rising_edge(clk_i)) then
             strobe_r <= '0';
             write_r <= '0';
+            send_response_r <= '0';
 
             case (rx_fsm_r) is
                 when idle_s =>
@@ -200,6 +201,7 @@ begin
                                 rx_fsm_r <= write_s;
                             elsif (command_read_r = '1') then
                                 udp_ready_r <= '0';
+                                send_response_r <= '1';
                                 rx_fsm_r <= read_s;
                             else
                                 rx_fsm_r <= wait_for_end_s;
@@ -222,7 +224,6 @@ begin
                     end if;
 
                 when write_ack_s =>
-          --          if (fifo_data_available = '1') then
                     if ((vector_or(std_logic_vector(size_counter_r(burst_size_r'length+1 downto 2))) = '1') or (fifo_data_available = '1')) then
                         if (size_counter_r = to_unsigned(0, size_counter_r'length)) then
                             if (last_store_r = '1') then
@@ -241,18 +242,17 @@ begin
                 when read_s =>
                     strobe_r <= '1';
                     burst_size_r <= std_logic_vector(size_counter_r(burst_size_r'length+1 downto 2)-1);
+                    size_counter_r <= size_counter_r - resize(size_counter_r(burst_size_r'length+1 downto 0), size_counter_r'length);
                     rx_fsm_r <= wait_for_done_s;
 
                 when wait_for_done_s =>
                     if (response_done_r = '1') then
-                        send_response_r <= '0';
                         rx_fsm_r <= idle_s;
-                    else
-                        send_response_r <= '1';
                     end if;
                     if (tx_request_next_r = '1') then
                         address_r <= std_logic_vector(unsigned(address_r) + resize_left_aligned(unsigned(burst_size_r), burst_size_r'length+2) + 4);
-                        size_counter_r <= size_counter_r - resize(resize_left_aligned(unsigned(burst_size_r), burst_size_r'length+2), size_counter_r'length);
+                        size_counter_r <= size_counter_r - resize(resize_left_aligned(resize(unsigned(burst_size_r), burst_size_r'length+1)+1, burst_size_r'length+3), size_counter_r'length);
+                        burst_size_r <= std_logic_vector(size_counter_r(burst_size_r'length+1 downto 2)-1);
                         strobe_r <= '1';
                     end if;
 
@@ -291,15 +291,14 @@ begin
                 when idle_s =>
                     data_counter_r <= to_unsigned(bytes_per_transfer_c-1, data_counter_r'length);
                     tx_size_r <= '0' & size_counter_r;
-                    -- clear write ack / get read data to send
+                    -- clear write ack
                     if (fifo_data_available = '1') then
-                        tx_data_r <= fifo_data;
                         fifo_read_r <= '1';
                     end if;
                     -- send read data
                     timeout_counter_en_r <= send_response_r;
                     timeout_active_r <= timeout_counter_r(timeout_counter_r'high);
-                    if ((timeout_counter_r(timeout_counter_r'high) = '1') or ((send_response_r = '1') and (fifo_data_available = '1'))) then
+                    if ((timeout_counter_r(timeout_counter_r'high) = '1') or (send_response_r = '1')) then
                         tx_fsm_r <= packet_nr_s;
                     end if;
 
@@ -345,8 +344,15 @@ begin
                         tx_size_field_count_r <= tx_size_field_count_r - 1;
                         if (vector_or(std_logic_vector(tx_size_field_count_r)) = '0') then
                             tx_size_r <= tx_size_r - (bytes_per_transfer_c + 1);
-                            tx_fsm_r <= data_s;
+                            tx_fsm_r <= get_data_s;
                         end if;
+                    end if;
+
+                when get_data_s =>
+                    if (fifo_data_available = '1') then
+                        tx_data_r <= fifo_data;
+                        fifo_read_r <= '1';
+                        tx_fsm_r <= data_s;
                     end if;
 
                 when data_s =>
@@ -357,7 +363,7 @@ begin
                         data_counter_r <= data_counter_r - 1;
                         if (data_counter_r = to_unsigned(1, data_counter_r'length)) then
                             -- request next burst if needed
-                            if ((vector_and(std_logic_vector(tx_size_r(2+burst_size_r'length downto 2))) = '1') and (tx_size_r(tx_size_r'high) = '0')) then
+                            if ((vector_and(std_logic_vector(tx_size_r(1+burst_size_r'length downto 2))) = '1') and (tx_size_r(tx_size_r'high) = '0')) then
                                 tx_request_next_r <= '1';
                             end if;
                             tx_fsm_r <= last_byte_s;
