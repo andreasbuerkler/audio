@@ -623,7 +623,7 @@ begin
                 reset_vec_r <= reset_vec_r + 1;
             end if;
             -- reset ethernet phy
-            if ((register_write_data(register_address_reset_c)(1) = '1') and (register_write_strb(register_address_reset_c) = '1')) then
+            if (((register_write_data(register_address_reset_c)(1) = '1') and (register_write_strb(register_address_reset_c) = '1')) or (reset = '1')) then
                 reset_eth_vec_r <= (others => '0');
             elsif (reset_eth_vec_r(reset_eth_vec_r'high) = '0') then
                 reset_eth_vec_r <= reset_eth_vec_r + 1;
@@ -634,7 +634,7 @@ begin
     reset <= not reset_vec_r(reset_vec_r'high);
     reset_n <= reset_vec_r(reset_vec_r'high);
 
-    -- output signals
+    -- counter for blinking LEDs
     led_proc : process (clk_pll_50)
     begin
         if (rising_edge(clk_pll_50)) then
@@ -642,6 +642,7 @@ begin
         end if;
     end process;
 
+    -- output signals
     led0_o       <= led_vec_r(led_vec_r'high-3) when (reset = '1') else
                     '1' when (led_vec_r(led_vec_r'high downto led_vec_r'high-1) = "00") else
                     '0';

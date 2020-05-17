@@ -3,7 +3,6 @@ using System.Net;
 using System.Net.Sockets;
 using System.Collections.Generic;
 using System.Threading;
-using System.Text;
 
 namespace Lcd
 {
@@ -44,7 +43,7 @@ namespace Lcd
             return false;
         }
 
-        public bool Read(UInt32 address, out List<UInt32> data, out UInt32 errorCode, Byte NumberOfBytes)
+        public bool Read(UInt32 address, out List<UInt32> data, out UInt32 errorCode, UInt16 NumberOfBytes)
         {
             bool success = SendReadRequest(address, _packetId, NumberOfBytes);
             if (success)
@@ -76,7 +75,8 @@ namespace Lcd
                 {
                     byteList.Add(Convert.ToByte(((int)address >> (8 * dataByte)) & 0xff));
                 }
-                byteList.Add(0x04); // data length
+                byteList.Add(0x00); // data length MSB
+                byteList.Add(0x04); // data length LSB
                 for (int dataByte = 3; dataByte >= 0; dataByte--)
                 {
                     byteList.Add(Convert.ToByte(((int)data >> (8 * dataByte)) & 0xff));
@@ -92,7 +92,7 @@ namespace Lcd
             return true;
         }
 
-        public bool Write(UInt32 address, List<UInt32> data, out UInt32 errorCode, Byte NumberOfBytes)
+        public bool Write(UInt32 address, List<UInt32> data, out UInt32 errorCode, UInt16 NumberOfBytes)
         {
             try
             {
@@ -105,7 +105,8 @@ namespace Lcd
                 {
                     byteList.Add(Convert.ToByte(((int)address >> (8 * dataByte)) & 0xff));
                 }
-                byteList.Add(NumberOfBytes); // data length
+                byteList.Add((Byte)((NumberOfBytes >> 8) & 0xFF)); // data length MSB
+                byteList.Add((Byte)(NumberOfBytes & 0xFF)); // data length LSB
                 for (int dataWord = 0; dataWord < NumberOfBytes/4; dataWord++) {
                     for (int dataByte = 3; dataByte >= 0; dataByte--) {
                         byteList.Add(Convert.ToByte(((int)data[dataWord] >> (8 * dataByte)) & 0xff));
@@ -124,7 +125,7 @@ namespace Lcd
             return true;
         }
 
-        private bool SendReadRequest(UInt32 address, Byte packetId, Byte NumberOfBytes) {
+        private bool SendReadRequest(UInt32 address, Byte packetId, UInt16 NumberOfBytes) {
             try {
                 List<Byte> byteList = new List<Byte>();
                 byteList.Add(packetId);
@@ -134,7 +135,8 @@ namespace Lcd
                 {
                     byteList.Add(Convert.ToByte(((int)address >> (8 * dataByte)) & 0xff));
                 }
-                byteList.Add(NumberOfBytes); // data length
+                byteList.Add((Byte)((NumberOfBytes >> 8) & 0xFF)); // data length MSB
+                byteList.Add((Byte)(NumberOfBytes & 0xFF)); // data length LSB
                 Byte[] sendBytes = byteList.ToArray();
                 _udpClient.Send(sendBytes, sendBytes.Length);
             } catch (Exception e) {
@@ -144,7 +146,7 @@ namespace Lcd
             return true;
         }
 
-        private bool GetReadData(out List<UInt32> data, out UInt32 errorCode, Byte packetId, Byte NumberOfBytes) {
+        private bool GetReadData(out List<UInt32> data, out UInt32 errorCode, Byte packetId, UInt16 NumberOfBytes) {
             data = new List<UInt32>();
             try {
                 int timeout = _TIMEOUT_MS;
@@ -163,11 +165,11 @@ namespace Lcd
                             errorCode = _ERROR_TYPE;
                             return false;
                         }
-                        if (receiveBytes[2] != NumberOfBytes) { // length
+                        if (( (((UInt16)receiveBytes[2]) << 8) | receiveBytes[3]) != NumberOfBytes) { // length
                             errorCode = _ERROR_RECEIVED_LENGTH;
                             return false;
                         }
-                        if (receiveBytes.Length != (3+ NumberOfBytes)) {
+                        if (receiveBytes.Length != (4+NumberOfBytes)) {
                             errorCode = _ERROR_PACKET_LENGTH;
                             return false;
                         }
@@ -175,7 +177,7 @@ namespace Lcd
                         for (int dataword = 0; dataword < NumberOfBytes; dataword += 4) {
                             UInt32 receivedData = 0;
                             for (int databyte = 3; databyte >= 0; databyte--) {
-                                receivedData |= Convert.ToUInt32((int)(receiveBytes[dataword + databyte + 3] << ((3 - databyte) * 8)) & 0xFFFFFFFF);
+                                receivedData |= Convert.ToUInt32((int)(receiveBytes[dataword + databyte + 4] << ((3 - databyte) * 8)) & 0xFFFFFFFF);
                             }
                             data.Add(receivedData);
                         }
