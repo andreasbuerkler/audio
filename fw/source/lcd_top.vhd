@@ -168,7 +168,7 @@ architecture rtl of lcd_top is
         ctrl_ack_o        : out std_logic);
     end component registerbank;
 
-    component interconnect is
+    component slave_interconnect is
     generic (
         address_map_g          : std_logic_array;
         master_data_width_g    : positive;
@@ -193,7 +193,7 @@ architecture rtl of lcd_top is
         slave_strobe_o      : out std_logic_vector;
         slave_write_o       : out std_logic_vector;
         slave_ack_i         : in  std_logic_vector);
-    end component interconnect;
+    end component slave_interconnect;
 
     component i2c_master is
     generic (
@@ -444,7 +444,7 @@ begin
         ctrl_write_o      => ctrl_write,
         ctrl_ack_i        => ctrl_ack);
 
-    i_interconnect : interconnect
+    i_slave_interconnect : slave_interconnect
     generic map (
         address_map_g          => address_map_c,
         master_data_width_g    => ctrl_data_width_c,

@@ -1,7 +1,7 @@
 --------------------------------------------------------------------------------
 -- Author    : Andreas Buerkler
 -- Date      : 04.01.2020
--- Filename  : interconnect_tb.vhd
+-- Filename  : slave_interconnect_tb.vhd
 -- Changelog : 04.01.2020 - file created
 --------------------------------------------------------------------------------
 
@@ -12,12 +12,12 @@ use ieee.numeric_std.all;
 library work;
 use work.fpga_pkg.all;
 
-entity interconnect_tb is
-end entity interconnect_tb;
+entity slave_interconnect_tb is
+end entity slave_interconnect_tb;
 
-architecture rtl of interconnect_tb is
+architecture rtl of slave_interconnect_tb is
 
-    component interconnect is
+    component slave_interconnect is
     generic (
         address_map_g          : std_logic_array;
         master_data_width_g    : positive;
@@ -42,7 +42,7 @@ architecture rtl of interconnect_tb is
         slave_strobe_o      : out std_logic_vector;
         slave_write_o       : out std_logic_vector;
         slave_ack_i         : in  std_logic_vector);
-    end component interconnect;
+    end component slave_interconnect;
 
     constant address_map_c : std_logic_array := (0 => "000000000000----",
                                                  1 => "000000000001----",
@@ -80,7 +80,7 @@ begin
         end if;
     end process clkgen_proc;
 
-    i_interconnect : interconnect
+    i_interconnect : slave_interconnect
     generic map (
         address_map_g          => address_map_c,
         master_data_width_g    => 32,

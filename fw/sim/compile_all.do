@@ -15,7 +15,8 @@ if { $::argc != 1 } {
     vcom ../source/dual_clock_ram.vhd -check_synthesis
     vcom ../source/registerbank.vhd -check_synthesis
     vcom ../source/clock_converter.vhd -check_synthesis
-    vcom ../source/interconnect.vhd -check_synthesis
+    vcom ../source/slave_interconnect.vhd -check_synthesis
+    vcom ../source/master_interconnect.vhd -check_synthesis
 
     # eth mac
     vcom ../source/rmii_interface.vhd -check_synthesis
@@ -86,7 +87,7 @@ if { $::argc != 1 } {
     vcom ../testbench/crossfader_tb.vhd
     vcom ../testbench/convolution_tb.vhd
     vcom ../testbench/sinus_gen_tb.vhd
-    vcom ../testbench/interconnect_tb.vhd
+    vcom ../testbench/slave_interconnect_tb.vhd
     vcom ../testbench/mdio_debug_tb.vhd
     vcom ../testbench/lcd_controller_tb.vhd
     vcom ../testbench/hyper_ram_controller_tb.vhd

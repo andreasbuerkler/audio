@@ -1,7 +1,7 @@
 --------------------------------------------------------------------------------
 -- Author    : Andreas Buerkler
 -- Date      : 04.01.2020
--- Filename  : interconnect.vhd
+-- Filename  : slave_interconnect.vhd
 -- Changelog : 04.01.2020 - file created
 --------------------------------------------------------------------------------
 
@@ -12,7 +12,7 @@ use ieee.numeric_std.all;
 library work;
 use work.fpga_pkg.all;
 
-entity interconnect is
+entity slave_interconnect is
 generic (
     address_map_g          : std_logic_array := (0 => "--------");
     master_data_width_g    : positive := 32;
@@ -37,9 +37,9 @@ port (
     slave_strobe_o      : out std_logic_vector;
     slave_write_o       : out std_logic_vector;
     slave_ack_i         : in  std_logic_vector);
-end entity interconnect;
+end entity slave_interconnect;
 
-architecture rtl of interconnect is
+architecture rtl of slave_interconnect is
 
     signal strobe_a               : std_logic_vector(address_map_g'length-1 downto 0);
     signal write_a                : std_logic_vector(address_map_g'length-1 downto 0);

@@ -18,11 +18,15 @@ package fpga_pkg is
     function log2ceil (n : natural) return natural;
     function reverse (n : std_logic_vector) return std_logic_vector;
     function vector_or (n : std_logic_vector) return std_logic;
+    function vector_or (n : unsigned) return std_logic;
     function vector_and (n : std_logic_vector) return std_logic;
+    function vector_and (n : unsigned) return std_logic;
     function checksum_add (n, u : std_logic_vector) return std_logic_vector;
     function resize_left_aligned (n : unsigned; u : positive) return unsigned;
     function resize_left_aligned (n : signed; u : positive) return signed;
     function array_extract(index : natural; in_array : std_logic_array) return std_logic_vector;
+    function vector_multiply (in_vector : std_logic_vector; factor : positive) return std_logic_vector;
+    function vector_multiply (in_vector : std_logic; factor : positive) return std_logic_vector;
     function bin_to_gray (b : unsigned) return unsigned;
     function gray_to_bin (b : unsigned) return unsigned;
 
@@ -64,7 +68,27 @@ package body fpga_pkg is
         return n_or;
     end vector_or;
 
+    function vector_or (n : unsigned) return std_logic is
+        variable n_or : std_logic;
+    begin
+        n_or := '0';
+        for i in n'high downto n'low loop
+            n_or := n_or or n(i);
+        end loop;
+        return n_or;
+    end vector_or;
+
     function vector_and (n : std_logic_vector) return std_logic is
+        variable n_and : std_logic;
+    begin
+        n_and := '1';
+        for i in n'high downto n'low loop
+            n_and := n_and and n(i);
+        end loop;
+        return n_and;
+    end vector_and;
+
+    function vector_and (n : unsigned) return std_logic is
         variable n_and : std_logic;
     begin
         n_and := '1';
@@ -118,6 +142,24 @@ package body fpga_pkg is
         end loop;
         return out_vector_v;
     end function array_extract;
+
+    function vector_multiply(in_vector : std_logic_vector; factor : positive) return std_logic_vector is
+        variable out_vector_v : std_logic_vector(in_vector'length*factor-1 downto 0);
+    begin
+        for i in 0 to factor-1 loop
+            out_vector_v((in_vector'length*i)+i-1 downto (in_vector'length*i)) := in_vector(in_vector'range);
+        end loop;
+        return out_vector_v;
+    end function vector_multiply;
+
+    function vector_multiply(in_vector : std_logic; factor : positive) return std_logic_vector is
+        variable out_vector_v : std_logic_vector(factor-1 downto 0);
+    begin
+        for i in 0 to factor-1 loop
+            out_vector_v(i) := in_vector;
+        end loop;
+        return out_vector_v;
+    end function vector_multiply;
 
     function bin_to_gray (b : unsigned) return unsigned is
         variable retval : unsigned(b'range);
