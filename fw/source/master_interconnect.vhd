@@ -65,8 +65,8 @@ architecture rtl of master_interconnect is
 
     signal master_sel_r            : std_logic_vector(number_of_masters_g-1 downto 0) := std_logic_vector(to_unsigned(1, number_of_masters_g));
     signal master_write_r          : std_logic_vector(number_of_masters_g-1 downto 0) := (others => '0');
-    signal master_burst_size_r     : std_logic_array(number_of_masters_g-1 downto 0, log2ceil(burst_size_g)-1 downto 0) := (others => (others => '0'));
-    signal master_address_r        : std_logic_array(number_of_masters_g-1 downto 0, address_width_g-1 downto 0) := (others => (others => '0'));
+    signal master_burst_size       : std_logic_array(number_of_masters_g-1 downto 0, log2ceil(burst_size_g)-1 downto 0);
+    signal master_address          : std_logic_array(number_of_masters_g-1 downto 0, address_width_g-1 downto 0);
     signal master_data             : std_logic_array(number_of_masters_g-1 downto 0, data_width_g-1 downto 0);
     signal master_data_available_r : std_logic_vector(number_of_masters_g-1 downto 0) := (others => '0');
 
@@ -79,12 +79,11 @@ architecture rtl of master_interconnect is
     signal slave_write_data        : std_logic_vector(data_width_g-1 downto 0);
     signal slave_ack               : std_logic_vector(number_of_masters_g-1 downto 0);
 
-    signal fifo_empty              : std_logic_vector(number_of_masters_g-1 downto 0);
-    signal fifo_empty_a            : std_logic;
-    signal fifo_read_r             : std_logic_vector(number_of_masters_g-1 downto 0) := (others => '0');
+    signal fifo_read_a             : std_logic_vector(number_of_masters_g-1 downto 0);
 
     signal burst_counter_r         : unsigned(log2ceil(burst_size_g)-1 downto 0) := (others => '0');
     signal burst_in_progress_r     : std_logic := '0';
+    signal burst_last_r            : std_logic := '0';
 
     signal read_data               : std_logic_array(number_of_masters_g-1 downto 0, data_width_g-1 downto 0);
 
@@ -93,6 +92,9 @@ begin
     master_gen : for i in 0 to number_of_masters_g-1 generate
         signal fifo_read_data : std_logic_vector(data_width_g-1 downto 0);
         signal write_data     : std_logic_vector(data_width_g-1 downto 0);
+        signal burst_size_r   : std_logic_vector(log2ceil(burst_size_g)-1 downto 0) := (others => '0');
+        signal address_r      : std_logic_vector(address_width_g-1 downto 0) := (others => '0');
+        signal fifo_empty     : std_logic;
     begin
         write_data <= array_extract(i, master_data_i);
 
@@ -114,45 +116,49 @@ begin
             full_o   => open,
             -- read port
             data_o   => fifo_read_data,
-            rd_i     => fifo_read_r(i),
-            empty_o  => fifo_empty(i));
+            rd_i     => fifo_read_a(i),
+            empty_o  => fifo_empty);
 
-        master_data_gen : for j in 0 to log2ceil(burst_size_g)-1 generate
+        fifo_read_a(i) <= master_data_available_r(i) and master_sel_r(i) and burst_in_progress_r and (not fifo_empty);
+
+        master_data_gen : for j in 0 to data_width_g-1 generate
             master_data(i, j) <= fifo_read_data(j);
         end generate master_data_gen;
+
+        burst_size_gen : for j in 0 to log2ceil(burst_size_g)-1 generate
+            master_burst_size(i, j) <= burst_size_r(j);
+        end generate burst_size_gen;
+
+        address_gen : for j in 0 to address_width_g-1 generate
+            master_address(i, j) <= address_r(j);
+        end generate address_gen;
 
         data_proc : process (clk_i)
         begin
             if (rising_edge(clk_i)) then
                 if ((master_data_available_r(i) = '0') and (master_strobe_i(i) = '1')) then
                     master_write_r(i) <= master_write_i(i);
-                    for j in 0 to log2ceil(burst_size_g)-1 loop
-                        master_burst_size_r(i, j) <= master_burst_size_i(i, j);
-                    end loop;
-                    for j in 0 to address_width_g-1 loop
-                        master_address_r(i, j) <= master_address_i(i, j);
-                    end loop;
+                    burst_size_r <= array_extract(i, master_burst_size_i);
+                    address_r <= array_extract(i, master_address_i);
                     master_data_available_r(i) <= '1';
                 end if;
-                if ((burst_in_progress_r = '1') and (vector_or(burst_counter_r) = '0') and (master_sel_r(i) = '1')) then
+                if (burst_last_r = '1') then
                     master_data_available_r(i) <= '0';
                 end if;
             end if;
         end process data_proc;
     end generate master_gen;
 
-    select_async_proc : process(master_sel_r, master_address_r, master_burst_size_r, master_write_r, fifo_empty)
+    select_async_proc : process(master_sel_r, master_address, master_burst_size, master_write_r)
     begin
-        slave_address_a <= array_extract(0, master_address_r);
-        slave_burst_size_a <= array_extract(0, master_burst_size_r);
+        slave_address_a <= array_extract(0, master_address);
+        slave_burst_size_a <= array_extract(0, master_burst_size);
         slave_write_a <= master_write_r(0);
-        fifo_empty_a <= fifo_empty(0);
         for i in 0 to number_of_masters_g-1 loop
             if (master_sel_r(i) = '1') then
-                slave_address_a <= array_extract(i, master_address_r);
-                slave_burst_size_a <= array_extract(i, master_burst_size_r);
+                slave_address_a <= array_extract(i, master_address);
+                slave_burst_size_a <= array_extract(i, master_burst_size);
                 slave_write_a <= master_write_r(i);
-                fifo_empty_a <= fifo_empty(i);
             end if;
         end loop;
     end process select_async_proc;
@@ -174,29 +180,23 @@ begin
         end if;
     end process select_proc;
 
-    transfer_proc : process(clk_i)
+    burst_proc : process(clk_i)
     begin
         if (rising_edge(clk_i)) then
-            fifo_read_r <= (others => '0');
+            burst_last_r <= '0';
             if (vector_or(master_data_available_r and master_sel_r) = '1') then
-                -- burst count
-                if ((vector_or(burst_counter_r) = '0') and (burst_in_progress_r = '0')) then
+                if ((burst_in_progress_r = '0') and (burst_last_r = '0')) then
                     burst_counter_r <= unsigned(slave_burst_size_a);
                     burst_in_progress_r <= '1';
-                elsif (vector_or(burst_counter_r) = '1') then
-                    if (((fifo_empty_a = '0') and (slave_write_a = '1')) or ((slave_write_a = '0') and (slave_ack_i = '1'))) then
-                        burst_counter_r <= burst_counter_r - 1;
-                    end if;
-                else
-                    burst_in_progress_r <= '0';
-                end if;
-                -- read command / data
-                if (fifo_empty_a = '0') then
-                    fifo_read_r <= master_sel_r;
+                elsif (((vector_or(fifo_read_a) = '1') and (slave_write_a = '1')) or
+                       ((slave_ack_i = '1') and (slave_write_a = '0'))) then
+                    burst_in_progress_r <= vector_or(burst_counter_r);
+                    burst_last_r <= not vector_or(burst_counter_r);
+                    burst_counter_r <= burst_counter_r - 1;
                 end if;
             end if;
         end if;
-    end process transfer_proc;
+    end process burst_proc;
 
     write_data_proc : process (master_data, master_sel_r)
     begin
@@ -234,6 +234,6 @@ begin
     slave_address_o <= slave_address_r;
     slave_burst_size_o <= slave_burst_size_r;
     slave_write_o <= slave_write_r;
-    slave_strobe_o <= vector_or(fifo_read_r);
+    slave_strobe_o <= vector_or(fifo_read_a);
 
 end rtl;

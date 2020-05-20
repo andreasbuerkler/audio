@@ -168,6 +168,33 @@ architecture rtl of lcd_top is
         ctrl_ack_o        : out std_logic);
     end component registerbank;
 
+    component master_interconnect is
+    generic (
+        number_of_masters_g : positive;
+        data_width_g        : positive;
+        address_width_g     : positive;
+        burst_size_g        : positive);
+    port (
+        clk_i               : in std_logic;
+        reset_i             : in std_logic;
+        -- master
+        master_address_i    : in  std_logic_array;
+        master_data_i       : in  std_logic_array;
+        master_data_o       : out std_logic_array;
+        master_burst_size_i : in  std_logic_array;
+        master_strobe_i     : in  std_logic_vector;
+        master_write_i      : in  std_logic_vector;
+        master_ack_o        : out std_logic_vector;
+        -- slave
+        slave_address_o     : out std_logic_vector(address_width_g-1 downto 0);
+        slave_data_i        : in  std_logic_vector(data_width_g-1 downto 0);
+        slave_data_o        : out std_logic_vector(data_width_g-1 downto 0);
+        slave_burst_size_o  : out std_logic_vector(log2ceil(burst_size_g)-1 downto 0);
+        slave_strobe_o      : out std_logic;
+        slave_write_o       : out std_logic;
+        slave_ack_i         : in  std_logic);
+    end component master_interconnect;
+
     component slave_interconnect is
     generic (
         address_map_g          : std_logic_array;
@@ -295,6 +322,9 @@ architecture rtl of lcd_top is
     constant ip_address_c    : std_logic_vector(31 downto 0) := x"C0A80064";
     constant ctrl_port_c     : std_logic_vector(15 downto 0) := x"1234";
 
+    constant number_of_masters_c : positive := 3;
+    constant master_eth_c        : natural := 0;
+
     constant number_of_slaves_c   : positive := 3;
     constant slave_registerbank_c : natural := 0;
     constant slave_i2c_master_c   : natural := 1;
@@ -343,15 +373,27 @@ architecture rtl of lcd_top is
     signal i2c_scl  : std_logic;
 
     -- ctrl bus
-    signal ctrl_address    : std_logic_vector(ctrl_address_width_c-1 downto 0);
-    signal ctrl_data_in    : std_logic_vector(ctrl_data_width_c-1 downto 0);
-    signal ctrl_data_out   : std_logic_vector(ctrl_data_width_c-1 downto 0);
-    signal ctrl_burst_size : std_logic_vector(log2ceil(ctrl_max_burst_size_c)-1 downto 0);
-    signal ctrl_strobe     : std_logic;
-    signal ctrl_write      : std_logic;
-    signal ctrl_ack        : std_logic;
+    signal ctrl_address         : std_logic_array(number_of_masters_c-1 downto 0, ctrl_address_width_c-1 downto 0);
+    signal ctrl_read_data       : std_logic_array(number_of_masters_c-1 downto 0, ctrl_data_width_c-1 downto 0);
+    signal ctrl_write_data      : std_logic_array(number_of_masters_c-1 downto 0, ctrl_data_width_c-1 downto 0);
+    signal ctrl_burst_size      : std_logic_array(number_of_masters_c-1 downto 0, log2ceil(ctrl_max_burst_size_c)-1 downto 0);
+    signal ctrl_strobe          : std_logic_vector(number_of_masters_c-1 downto 0);
+    signal ctrl_write           : std_logic_vector(number_of_masters_c-1 downto 0);
+    signal ctrl_ack             : std_logic_vector(number_of_masters_c-1 downto 0);
 
-    -- ctrl interconnect
+    -- ctrl master interconnect
+    signal master_address    : std_logic_vector(ctrl_address_width_c-1 downto 0);
+    signal master_data_in    : std_logic_vector(ctrl_data_width_c-1 downto 0);
+    signal master_data_out   : std_logic_vector(ctrl_data_width_c-1 downto 0);
+    signal master_burst_size : std_logic_vector(log2ceil(ctrl_max_burst_size_c)-1 downto 0);
+    signal master_strobe     : std_logic;
+    signal master_write      : std_logic;
+    signal master_ack        : std_logic;
+    signal eth_address       : std_logic_vector(ctrl_address_width_c-1 downto 0);
+    signal eth_data          : std_logic_vector(ctrl_data_width_c-1 downto 0);
+    signal eth_burst_size    : std_logic_vector(log2ceil(ctrl_max_burst_size_c)-1 downto 0);
+
+    -- ctrl slave interconnect
     signal slave_address         : std_logic_array(number_of_slaves_c-1 downto 0, ctrl_address_width_c-1 downto 0);
     signal slave_read_data       : std_logic_array(number_of_slaves_c-1 downto 0, ctrl_data_width_c-1 downto 0);
     signal slave_write_data      : std_logic_array(number_of_slaves_c-1 downto 0, ctrl_data_width_c-1 downto 0);
@@ -436,13 +478,83 @@ begin
         mac_last_o        => mac_tx_last,
         mac_data_o        => mac_tx_data,
         -- ctrl
-        ctrl_address_o    => ctrl_address,
-        ctrl_data_o       => ctrl_data_out,
-        ctrl_data_i       => ctrl_data_in,
-        ctrl_burst_size_o => ctrl_burst_size,
-        ctrl_strobe_o     => ctrl_strobe,
-        ctrl_write_o      => ctrl_write,
-        ctrl_ack_i        => ctrl_ack);
+        ctrl_address_o    => eth_address,
+        ctrl_data_o       => eth_data,
+        ctrl_data_i       => array_extract(master_eth_c, ctrl_read_data),
+        ctrl_burst_size_o => eth_burst_size,
+        ctrl_strobe_o     => ctrl_strobe(master_eth_c),
+        ctrl_write_o      => ctrl_write(master_eth_c),
+        ctrl_ack_i        => ctrl_ack(master_eth_c));
+
+    i_master_interconnect : master_interconnect
+    generic map (
+        number_of_masters_g => number_of_masters_c,
+        data_width_g        => ctrl_data_width_c,
+        address_width_g     => ctrl_address_width_c,
+        burst_size_g        => ctrl_max_burst_size_c)
+    port map (
+        clk_i               => clk_pll_50,
+        reset_i             => reset,
+        -- master
+        master_address_i    => ctrl_address,
+        master_data_i       => ctrl_write_data,
+        master_data_o       => ctrl_read_data,
+        master_burst_size_i => ctrl_burst_size,
+        master_strobe_i     => ctrl_strobe,
+        master_write_i      => ctrl_write,
+        master_ack_o        => ctrl_ack,
+        -- slave
+        slave_address_o     => master_address,
+        slave_data_i        => master_data_in,
+        slave_data_o        => master_data_out,
+        slave_burst_size_o  => master_burst_size,
+        slave_strobe_o      => master_strobe,
+        slave_write_o       => master_write,
+        slave_ack_i         => master_ack);
+
+    eth_address_gen : for i in ctrl_address_width_c-1 downto 0 generate
+        ctrl_address(master_eth_c, i) <= eth_address(i);
+    end generate eth_address_gen;
+
+    eth_write_data_gen : for i in ctrl_data_width_c-1 downto 0 generate
+        ctrl_write_data(master_eth_c, i) <= eth_data(i);
+    end generate eth_write_data_gen;
+
+    eth_burst_size_gen : for i in log2ceil(ctrl_max_burst_size_c)-1 downto 0 generate
+        ctrl_burst_size(master_eth_c, i) <= eth_burst_size(i);
+    end generate eth_burst_size_gen;
+
+    -- unused master port 1
+    unused1_address_gen : for i in ctrl_address_width_c-1 downto 0 generate
+        ctrl_address(1, i) <= '0';
+    end generate unused1_address_gen;
+
+    unused1_write_data_gen : for i in ctrl_data_width_c-1 downto 0 generate
+        ctrl_write_data(1, i) <= '0';
+    end generate unused1_write_data_gen;
+
+    unused1_burst_size_gen : for i in log2ceil(ctrl_max_burst_size_c)-1 downto 0 generate
+        ctrl_burst_size(1, i) <= '0';
+    end generate unused1_burst_size_gen;
+
+    ctrl_write(1) <= '0';
+    ctrl_strobe(1) <= '0';
+
+    -- unused master port 2
+    unused2_address_gen : for i in ctrl_address_width_c-1 downto 0 generate
+        ctrl_address(2, i) <= '0';
+    end generate unused2_address_gen;
+
+    unused2_write_data_gen : for i in ctrl_data_width_c-1 downto 0 generate
+        ctrl_write_data(2, i) <= '0';
+    end generate unused2_write_data_gen;
+
+    unused2_burst_size_gen : for i in log2ceil(ctrl_max_burst_size_c)-1 downto 0 generate
+        ctrl_burst_size(2, i) <= '0';
+    end generate unused2_burst_size_gen;
+
+    ctrl_write(2) <= '0';
+    ctrl_strobe(2) <= '0';
 
     i_slave_interconnect : slave_interconnect
     generic map (
@@ -454,13 +566,13 @@ begin
         clk_i               => clk_pll_50,
         reset_i             => reset,
         -- master
-        master_address_i    => ctrl_address,
-        master_data_i       => ctrl_data_out,
-        master_data_o       => ctrl_data_in,
-        master_burst_size_i => ctrl_burst_size,
-        master_strobe_i     => ctrl_strobe,
-        master_write_i      => ctrl_write,
-        master_ack_o        => ctrl_ack,
+        master_address_i    => master_address,
+        master_data_i       => master_data_out,
+        master_data_o       => master_data_in,
+        master_burst_size_i => master_burst_size,
+        master_strobe_i     => master_strobe,
+        master_write_i      => master_write,
+        master_ack_o        => master_ack,
         -- slave
         slave_address_o    => slave_address,
         slave_data_i       => slave_read_data,

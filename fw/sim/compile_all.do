@@ -88,6 +88,7 @@ if { $::argc != 1 } {
     vcom ../testbench/convolution_tb.vhd
     vcom ../testbench/sinus_gen_tb.vhd
     vcom ../testbench/slave_interconnect_tb.vhd
+    vcom ../testbench/master_interconnect_tb.vhd
     vcom ../testbench/mdio_debug_tb.vhd
     vcom ../testbench/lcd_controller_tb.vhd
     vcom ../testbench/hyper_ram_controller_tb.vhd
