@@ -142,7 +142,7 @@ begin
                     address_r <= array_extract(i, master_address_i);
                     master_data_available_r(i) <= '1';
                 end if;
-                if (burst_last_r = '1') then
+                if ((burst_last_r = '1') and (master_sel_r(i) = '1')) then
                     master_data_available_r(i) <= '0';
                 end if;
             end if;
