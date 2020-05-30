@@ -81,7 +81,7 @@ architecture rtl of master_interconnect is
 
     signal fifo_read_a             : std_logic_vector(number_of_masters_g-1 downto 0);
 
-    signal burst_counter_r         : unsigned(log2ceil(burst_size_g)-1 downto 0) := (others => '0');
+    signal burst_counter_r         : unsigned(log2ceil(burst_size_g) downto 0) := (others => '0');
     signal burst_in_progress_r     : std_logic := '0';
     signal burst_last_r            : std_logic := '0';
 
@@ -186,10 +186,9 @@ begin
             burst_last_r <= '0';
             if (vector_or(master_data_available_r and master_sel_r) = '1') then
                 if ((burst_in_progress_r = '0') and (burst_last_r = '0')) then
-                    burst_counter_r <= unsigned(slave_burst_size_a);
+                    burst_counter_r <= unsigned('0' & slave_burst_size_a) + 1;
                     burst_in_progress_r <= '1';
-                elsif (((vector_or(fifo_read_a) = '1') and (slave_write_a = '1')) or
-                       ((slave_ack_i = '1') and (slave_write_a = '0'))) then
+                elsif ((vector_or(fifo_read_a) = '1') or (slave_ack_i = '1')) then
                     burst_in_progress_r <= vector_or(burst_counter_r);
                     burst_last_r <= not vector_or(burst_counter_r);
                     burst_counter_r <= burst_counter_r - 1;

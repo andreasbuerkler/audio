@@ -99,6 +99,33 @@ architecture rtl of master_interconnect_tb is
         slave_ack_i         : in  std_logic);
     end component master_interconnect;
 
+    component slave_interconnect is
+    generic (
+        address_map_g          : std_logic_array;
+        master_data_width_g    : positive;
+        master_address_width_g : positive;
+        master_burst_size_g    : positive);
+    port (
+        clk_i               : in std_logic;
+        reset_i             : in std_logic;
+        -- master
+        master_address_i    : in  std_logic_vector(master_address_width_g-1 downto 0);
+        master_data_i       : in  std_logic_vector(master_data_width_g-1 downto 0);
+        master_data_o       : out std_logic_vector(master_data_width_g-1 downto 0);
+        master_burst_size_i : in  std_logic_vector(log2ceil(master_burst_size_g)-1 downto 0);
+        master_strobe_i     : in  std_logic;
+        master_write_i      : in  std_logic;
+        master_ack_o        : out std_logic;
+        -- slave
+        slave_address_o     : out std_logic_array;
+        slave_data_i        : in  std_logic_array;
+        slave_data_o        : out std_logic_array;
+        slave_burst_size_o  : out std_logic_array;
+        slave_strobe_o      : out std_logic_vector;
+        slave_write_o       : out std_logic_vector;
+        slave_ack_i         : in  std_logic_vector);
+    end component slave_interconnect;
+
     constant address_width_c  : positive := 16;
     constant data_width_c     : positive := 32;
     constant burst_size_c     : positive := 32;
@@ -282,6 +309,14 @@ architecture rtl of master_interconnect_tb is
     signal ctrl_3_write      : std_logic;
     signal ctrl_3_ack        : std_logic;
 
+    signal ctrl_4_address    : std_logic_vector(address_width_c-1 downto 0);
+    signal ctrl_4_data_r     : std_logic_vector(data_width_c-1 downto 0);
+    signal ctrl_4_data_w     : std_logic_vector(data_width_c-1 downto 0);
+    signal ctrl_4_burst_size : std_logic_vector(log2ceil(burst_size_c)-1 downto 0);
+    signal ctrl_4_strobe     : std_logic;
+    signal ctrl_4_write      : std_logic;
+    signal ctrl_4_ack        : std_logic;
+
     signal register_read_data_r : std_logic_array_32(register_count_c-1 downto 0) := (others => (others => '0'));
     signal register_read_strb_r : std_logic_vector(register_count_c-1 downto 0) := (others => '0');
 
@@ -318,6 +353,11 @@ architecture rtl of master_interconnect_tb is
     signal master_strobe     : std_logic_vector(2 downto 0);
     signal master_write      : std_logic_vector(2 downto 0);
     signal master_ack        : std_logic_vector(2 downto 0);
+
+    signal slave_read_array       : std_logic_array(0 downto 0, data_width_c-1 downto 0);
+    signal slave_write_array      : std_logic_array(0 downto 0, data_width_c-1 downto 0);
+    signal slave_burst_size_array : std_logic_array(0 downto 0, log2ceil(burst_size_c)-1 downto 0);
+    signal slave_address_array    : std_logic_array(0 downto 0, address_width_c-1 downto 0);
 
 begin
 
@@ -473,6 +513,40 @@ begin
         slave_write_o       => ctrl_3_write,
         slave_ack_i         => ctrl_3_ack);
 
+    i_slave_interconnect : slave_interconnect
+    generic map (
+        address_map_g          => (0 => "----------------"),
+        master_data_width_g    => data_width_c,
+        master_address_width_g => address_width_c,
+        master_burst_size_g    => burst_size_c)
+    port map (
+        clk_i               => clk,
+        reset_i             => '0',
+        -- master
+        master_address_i    => ctrl_3_address,
+        master_data_i       => ctrl_3_data_w,
+        master_data_o       => ctrl_3_data_r,
+        master_burst_size_i => ctrl_3_burst_size,
+        master_strobe_i     => ctrl_3_strobe,
+        master_write_i      => ctrl_3_write,
+        master_ack_o        => ctrl_3_ack,
+        -- slave
+        slave_address_o     => slave_address_array,
+        slave_data_i        => slave_read_array,
+        slave_data_o        => slave_write_array,
+        slave_burst_size_o  => slave_burst_size_array,
+        slave_strobe_o(0)   => ctrl_4_strobe,
+        slave_write_o(0)    => ctrl_4_write,
+        slave_ack_i(0)      => ctrl_4_ack);
+
+    ctrl_4_data_w <= array_extract(0, slave_write_array);
+    ctrl_4_burst_size <= array_extract(0, slave_burst_size_array);
+    ctrl_4_address <= array_extract(0, slave_address_array);
+
+    slave_data_gen : for j in 0 to data_width_c-1 generate
+        slave_read_array(0, j) <= ctrl_4_data_r(j);
+    end generate slave_data_gen;
+
     i_registerbank : registerbank
     generic map (
         register_count_g => register_count_c,
@@ -491,13 +565,13 @@ begin
         data_o            => open,
         data_strb_o       => open,
         -- ctrl bus
-        ctrl_address_i    => ctrl_3_address(address_width_c-1 downto 2),
-        ctrl_data_i       => ctrl_3_data_w,
-        ctrl_data_o       => ctrl_3_data_r,
-        ctrl_burst_size_i => ctrl_3_burst_size,
-        ctrl_strobe_i     => ctrl_3_strobe,
-        ctrl_write_i      => ctrl_3_write,
-        ctrl_ack_o        => ctrl_3_ack);
+        ctrl_address_i    => ctrl_4_address(address_width_c-1 downto 2),
+        ctrl_data_i       => ctrl_4_data_w,
+        ctrl_data_o       => ctrl_4_data_r,
+        ctrl_burst_size_i => ctrl_4_burst_size,
+        ctrl_strobe_i     => ctrl_4_strobe,
+        ctrl_write_i      => ctrl_4_write,
+        ctrl_ack_o        => ctrl_4_ack);
 
     ctrl0_proc : process
         variable address_v    : std_logic_vector(address_width_c-1 downto 0);
