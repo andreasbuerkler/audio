@@ -19,6 +19,7 @@ architecture rtl of lcd_controller_tb is
 
     component lcd_controller
     generic (
+        buffer_address_g         : std_logic_vector;
         ctrl_data_width_g        : positive := 32;
         ctrl_address_width_g     : positive := 32;
         ctrl_max_burst_size_g    : positive := 32;
@@ -50,8 +51,10 @@ architecture rtl of lcd_controller_tb is
         buffer_o          : out std_logic_vector(framebuffer_count_g-1 downto 0);
         ctrl_address_o    : out std_logic_vector(ctrl_address_width_g-1 downto 0);
         ctrl_data_i       : in  std_logic_vector(ctrl_data_width_g-1 downto 0);
-        ctrl_burst_size_o : out std_logic_vector(log2ceil(ctrl_max_burst_size_g) downto 0);
+        ctrl_data_o       : out std_logic_vector(ctrl_data_width_g-1 downto 0);
+        ctrl_burst_size_o : out std_logic_vector(log2ceil(ctrl_max_burst_size_g)-1 downto 0);
         ctrl_strobe_o     : out std_logic;
+        ctrl_write_o      : out std_logic;
         ctrl_ack_i        : in  std_logic);
     end component lcd_controller;
 
@@ -61,7 +64,7 @@ architecture rtl of lcd_controller_tb is
 
     signal ctrl_address    : std_logic_vector(31 downto 0);
     signal ctrl_data_r     : std_logic_vector(31 downto 0) := (others => '0');
-    signal ctrl_burst_size : std_logic_vector(5 downto 0);
+    signal ctrl_burst_size : std_logic_vector(4 downto 0);
     signal ctrl_strobe     : std_logic;
     signal ctrl_ack_r      : std_logic := '0';
 
@@ -93,6 +96,7 @@ begin
 
     i_dut : lcd_controller
     generic map (
+        buffer_address_g         => x"80000000",
         ctrl_data_width_g        => 32,
         ctrl_address_width_g     => 32,
         ctrl_max_burst_size_g    => 32,
@@ -124,8 +128,10 @@ begin
         buffer_o          => open,
         ctrl_address_o    => ctrl_address,
         ctrl_data_i       => ctrl_data_r,
+        ctrl_data_o       => open,
         ctrl_burst_size_o => ctrl_burst_size,
         ctrl_strobe_o     => ctrl_strobe,
+        ctrl_write_o      => open,
         ctrl_ack_i        => ctrl_ack_r);
 
     mem_proc : process (clk_register)
@@ -133,7 +139,7 @@ begin
         if (rising_edge(clk_register)) then
             ctrl_ack_r <= '0';
             if (ctrl_strobe = '1') then
-                burst_counter_r <= unsigned(ctrl_burst_size);
+                burst_counter_r <= unsigned('0' & ctrl_burst_size) + 1;
                 ctrl_data_r <= std_logic_vector(unsigned(ctrl_address) - 1);
             elsif (burst_counter_r /= 0) then
                 burst_counter_r <= burst_counter_r - 1;

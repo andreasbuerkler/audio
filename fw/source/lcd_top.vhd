@@ -274,7 +274,7 @@ architecture rtl of lcd_top is
 
     component lcd_controller is
     generic (
-        buffer_address_g         : std_logic_vector(31 downto 0);
+        buffer_address_g         : std_logic_vector;
         ctrl_data_width_g        : positive;
         ctrl_address_width_g     : positive;
         ctrl_max_burst_size_g    : positive;
@@ -306,8 +306,10 @@ architecture rtl of lcd_top is
         buffer_o          : out std_logic_vector(framebuffer_count_g-1 downto 0);
         ctrl_address_o    : out std_logic_vector(ctrl_address_width_g-1 downto 0);
         ctrl_data_i       : in  std_logic_vector(ctrl_data_width_g-1 downto 0);
-        ctrl_burst_size_o : out std_logic_vector(log2ceil(ctrl_max_burst_size_g) downto 0);
+        ctrl_data_o       : out std_logic_vector(ctrl_data_width_g-1 downto 0);
+        ctrl_burst_size_o : out std_logic_vector(log2ceil(ctrl_max_burst_size_g)-1 downto 0);
         ctrl_strobe_o     : out std_logic;
+        ctrl_write_o      : out std_logic;
         ctrl_ack_i        : in  std_logic);
     end component lcd_controller;
 
@@ -324,6 +326,7 @@ architecture rtl of lcd_top is
 
     constant number_of_masters_c : positive := 3;
     constant master_eth_c        : natural := 0;
+    constant master_lcd_c        : natural := 1;
 
     constant number_of_slaves_c   : positive := 3;
     constant slave_registerbank_c : natural := 0;
@@ -350,7 +353,7 @@ architecture rtl of lcd_top is
                                     others                          => '0');
     constant register_mask_c      : std_logic_array_32(register_count_c-1 downto 0) :=
                                    (register_address_version_c      => x"ffffffff",
-                                    register_address_test_c         => x"00000003",
+                                    register_address_test_c         => x"00000007",
                                     register_address_reset_c        => x"00000003",
                                     others                          => x"ffffffff");
 
@@ -392,6 +395,9 @@ architecture rtl of lcd_top is
     signal eth_address       : std_logic_vector(ctrl_address_width_c-1 downto 0);
     signal eth_data          : std_logic_vector(ctrl_data_width_c-1 downto 0);
     signal eth_burst_size    : std_logic_vector(log2ceil(ctrl_max_burst_size_c)-1 downto 0);
+    signal lcd_address       : std_logic_vector(ctrl_address_width_c-1 downto 0);
+    signal lcd_data          : std_logic_vector(ctrl_data_width_c-1 downto 0);
+    signal lcd_burst_size    : std_logic_vector(log2ceil(ctrl_max_burst_size_c)-1 downto 0);
 
     -- ctrl slave interconnect
     signal slave_address         : std_logic_array(number_of_slaves_c-1 downto 0, ctrl_address_width_c-1 downto 0);
@@ -524,21 +530,17 @@ begin
         ctrl_burst_size(master_eth_c, i) <= eth_burst_size(i);
     end generate eth_burst_size_gen;
 
-    -- unused master port 1
-    unused1_address_gen : for i in ctrl_address_width_c-1 downto 0 generate
-        ctrl_address(1, i) <= '0';
-    end generate unused1_address_gen;
+    lcd_address_gen : for i in ctrl_address_width_c-1 downto 0 generate
+        ctrl_address(master_lcd_c, i) <= lcd_address(i);
+    end generate lcd_address_gen;
 
-    unused1_write_data_gen : for i in ctrl_data_width_c-1 downto 0 generate
-        ctrl_write_data(1, i) <= '0';
-    end generate unused1_write_data_gen;
+    lcd_write_data_gen : for i in ctrl_data_width_c-1 downto 0 generate
+        ctrl_write_data(master_lcd_c, i) <= lcd_data(i);
+    end generate lcd_write_data_gen;
 
-    unused1_burst_size_gen : for i in log2ceil(ctrl_max_burst_size_c)-1 downto 0 generate
-        ctrl_burst_size(1, i) <= '0';
-    end generate unused1_burst_size_gen;
-
-    ctrl_write(1) <= '0';
-    ctrl_strobe(1) <= '0';
+    lcd_burst_size_gen : for i in log2ceil(ctrl_max_burst_size_c)-1 downto 0 generate
+        ctrl_burst_size(master_lcd_c, i) <= lcd_burst_size(i);
+    end generate lcd_burst_size_gen;
 
     -- unused master port 2
     unused2_address_gen : for i in ctrl_address_width_c-1 downto 0 generate
@@ -678,9 +680,9 @@ begin
 
     i_lcd : lcd_controller
     generic map (
-        buffer_address_g         => x"00000000",
-        ctrl_data_width_g        => 32,
-        ctrl_address_width_g     => 32,
+        buffer_address_g         => x"800000",
+        ctrl_data_width_g        => ctrl_data_width_c,
+        ctrl_address_width_g     => ctrl_address_width_c,
         ctrl_max_burst_size_g    => ctrl_max_burst_size_c,
         framebuffer_count_g      => 3,
         color_bits_g             => 4,
@@ -695,7 +697,7 @@ begin
     port map (
         clk_i             => clk_pll_50,
         reset_i           => reset,
-        enable_i          => '1',
+        enable_i          => register_write_data(register_address_test_c)(2),
         video_clk_i       => clk_video,
         -- lcd
         red_o(0)          => lcd_red_0_o,
@@ -717,11 +719,13 @@ begin
         -- frame buffer
         buffer_i          => "000",
         buffer_o          => open,
-        ctrl_address_o    => open,
-        ctrl_data_i       => register_write_data(3),
-        ctrl_burst_size_o => open,
-        ctrl_strobe_o     => open,
-        ctrl_ack_i        => register_write_strb(3));
+        ctrl_address_o    => lcd_address,
+        ctrl_data_i       => array_extract(master_lcd_c, ctrl_read_data),
+        ctrl_data_o       => lcd_data,
+        ctrl_burst_size_o => lcd_burst_size,
+        ctrl_strobe_o     => ctrl_strobe(master_lcd_c),
+        ctrl_write_o      => ctrl_write(master_Lcd_c),
+        ctrl_ack_i        => ctrl_ack(master_lcd_c));
 
     lcd_disp_o  <= register_write_data(register_address_test_c)(1);
     lcd_back_led_o  <= register_write_data(register_address_test_c)(0);
