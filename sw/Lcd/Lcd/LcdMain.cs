@@ -34,7 +34,7 @@ namespace Lcd
                 }
                 ethInst.Write(address, writeData, out errorCode, bytesPerPacket);
                 if (errorCode != Eth._ERROR_SUCCESS) {
-                    Console.WriteLine("ErrorCode = " + errorCode);
+                    Console.WriteLine("\nErrorCode = " + errorCode);
                 }
                 // prevent from FIFO overflow
                 if (addressOffset % 4096 == 0) {
@@ -53,11 +53,11 @@ namespace Lcd
                 ethInst.Read(address, out dataArray, out errorCode, bytesPerPacket);
 
                 if (errorCode != Eth._ERROR_SUCCESS) {
-                    Console.WriteLine("ErrorCode = " + errorCode + " at address " + addressOffset.ToString("X"));
+                    Console.WriteLine("\nErrorCode = " + errorCode + " at address " + addressOffset.ToString("X"));
                     break;
                 }
                 if (dataArray.Count != bytesPerPacket / 4) {
-                    Console.WriteLine("Received number of words wrong = " + dataArray.Count);
+                    Console.WriteLine("\nReceived number of words wrong = " + dataArray.Count);
                     break;
                 }
                 for (UInt32 wordIndex = 0; wordIndex < bytesPerPacket / 4; wordIndex++) {
@@ -69,12 +69,23 @@ namespace Lcd
                     }
                     if (dataArray[(int)wordIndex] != expectedData) {
                         UInt32 diff = dataArray[(int)wordIndex] ^ expectedData;
-                        Console.WriteLine("Read data wrong at address 0x" + addressOffset.ToString("X") + " diff 0x" + diff.ToString("X"));
+                        Console.WriteLine("\nRead data wrong at address 0x" + addressOffset.ToString("X") + " diff 0x" + diff.ToString("X"));
                         break;
                     }
                 }
                 Console.Write("\r -> read from address 0x" + addressOffset.ToString("X"));
             }
+        }
+
+        static void initMem(Eth ethInst)
+        {
+            Console.Write("\n");
+            Framebuffer buf = new Framebuffer();
+            buf.ClearBuffer();
+            buf.SetText("0123456789", 5, 5);
+            buf.SetText("abcdefghijklmnopqrstuvwxyz", 5, 6);
+            buf.SetText("-.:°%", 5, 7);
+            buf.UpdateBuffer(ethInst);
         }
 
         static void i2cTest(I2c i2cInst, Monitor monitorInst) {
@@ -98,7 +109,7 @@ namespace Lcd
             Console.WriteLine(String.Format("CH2: {0,6:0.00}V, {1,6:0.00}mA", status.ch2.voltage, status.ch2.current));
         }
         static void Main(string[] args) {
-            Console.WriteLine("---------- I2C read test ----------");
+            Console.WriteLine("---------- Test ----------");
         //    Acc test = new Acc();
         //    test.PrintPhysics();
         //    return;
@@ -107,10 +118,13 @@ namespace Lcd
             I2c i2cInst = new I2c(ethInst);
             Monitor monitorInst = new Monitor(i2cInst);
 
+         //   args = new string[] {"Q"};
+
             if (!(((args.Length == 3) && (Equals(args[0], "W"))) ||
                   ((args.Length == 2) && Equals(args[0], "R")) ||
                   ((args.Length == 1) && Equals(args[0], "I")) ||
-                  ((args.Length == 1) && Equals(args[0], "T")))) {
+                  ((args.Length == 1) && Equals(args[0], "T")) ||
+                  ((args.Length == 1) && Equals(args[0], "Q")))) {
                 Console.WriteLine("Usage: Lcd [R/W] [Address] ([Data])");
             }
             else
@@ -134,12 +148,19 @@ namespace Lcd
                 {
                     // I2C test
                     i2cTest(i2cInst, monitorInst);
-                } else if (Equals(args[0], "T")) {
+                }
+                else if (Equals(args[0], "T"))
+                {
                     // memory test
                     memTest(ethInst, true);
                 }
-                else {
-                    Console.WriteLine("Unknown argument (R,W,I,T)");
+                else if (Equals(args[0], "Q"))
+                {
+                    initMem(ethInst);
+                }
+                else
+                {
+                    Console.WriteLine("Unknown argument (R,W,I,T,Q)");
                 }
             }
         }
