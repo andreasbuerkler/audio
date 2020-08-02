@@ -81,11 +81,40 @@ namespace Lcd
         {
             Console.Write("\n");
             Framebuffer buf = new Framebuffer();
-            buf.ClearBuffer();
-            buf.SetText("0123456789", 5, 5);
-            buf.SetText("abcdefghijklmnopqrstuvwxyz", 5, 6);
-            buf.SetText("-.:°%", 5, 7);
-            buf.UpdateBuffer(ethInst);
+            //buf.SetText("0123456789", 1, 5);
+            //buf.SetText("abcdefghijklmnopqrstuvwxyz", 2, 5);
+            //buf.SetText("-.:°%", 3, 5);
+            buf.SetText("time 00:00.000", 5, 13);
+            buf.SetText("best 00:00.000", 7, 13);
+            buf.SetText("pos 12", 15, 17);
+            buf.SetText("96° 2.1bar", 9, 5);
+            buf.SetText("96° 2.1bar", 11, 5);
+            buf.SetText("96° 2.1bar", 9, 25);
+            buf.SetText("96° 2.1bar", 11, 25);
+            buf.SetText("120 kph", 5, 4);
+            buf.SetText("23 lap", 7, 5);
+            buf.SetText("12.3 l", 5, 33);
+            buf.SetText("4567 rpm", 7, 31);
+            buf.SetText("tc   3", 13, 25);
+            buf.SetText("abs  3", 13, 33);
+            buf.SetText("bias   63%", 15, 25);
+            buf.SetText("296°c", 13, 2);
+            buf.SetText("296°c", 15, 2);
+            buf.SetText("296°c", 13, 10);
+            buf.SetText("296°c", 15, 10);
+            buf.SetText("gear", 13, 18);
+
+            int speed = 0;
+            while (true)
+            {
+                buf.SetSpeed(speed);
+                buf.UpdateBuffer(ethInst);
+                speed += 100;
+                if (speed > 8000)
+                {
+                    speed = 0;
+                }
+            }
         }
 
         static void i2cTest(I2c i2cInst, Monitor monitorInst) {
@@ -118,7 +147,7 @@ namespace Lcd
             I2c i2cInst = new I2c(ethInst);
             Monitor monitorInst = new Monitor(i2cInst);
 
-         //   args = new string[] {"Q"};
+        //    args = new string[] {"Q"};
 
             if (!(((args.Length == 3) && (Equals(args[0], "W"))) ||
                   ((args.Length == 2) && Equals(args[0], "R")) ||

@@ -13,7 +13,7 @@ namespace Lcd
             ClearText();
         }
 
-        public bool SetText(string text, int posX, int posY)
+        public bool SetText(string text, int posY, int posX)
         {
             byte[] convertedText = Encoding.UTF8.GetBytes(text);
             int length = convertedText.Length;
@@ -43,8 +43,9 @@ namespace Lcd
             }
         }
 
-        public bool GetPixel(int posX, int posY, out bool pixel)
+        public bool GetPixel(int posY, int posX, out bool pixel)
         {
+            posY += _verticalPixelOffset;
             if ((posX < 0) || (posY < 0) || (posX >= _horizontalPixelSize) || (posY >= _verticalPixelSize)) {
                 pixel = false;
                 return false;
