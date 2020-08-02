@@ -19,11 +19,11 @@ architecture rtl of lcd_controller_tb is
 
     component lcd_controller
     generic (
-        buffer_address_g         : std_logic_vector;
+        buffer0_address_g        : std_logic_vector;
+        buffer1_address_g        : std_logic_vector;
         ctrl_data_width_g        : positive := 32;
         ctrl_address_width_g     : positive := 32;
         ctrl_max_burst_size_g    : positive := 32;
-        framebuffer_count_g      : positive := 3;
         color_bits_g             : positive := 4;
         image_width_g            : positive := 320;
         image_height_g           : positive := 240;
@@ -47,8 +47,7 @@ architecture rtl of lcd_controller_tb is
         de_o              : out std_logic;
         pclk_o            : out std_logic;
         -- frame buffer
-        buffer_i          : in  std_logic_vector(framebuffer_count_g-1 downto 0);
-        buffer_o          : out std_logic_vector(framebuffer_count_g-1 downto 0);
+        buffer_sel_i      : in  std_logic;
         ctrl_address_o    : out std_logic_vector(ctrl_address_width_g-1 downto 0);
         ctrl_data_i       : in  std_logic_vector(ctrl_data_width_g-1 downto 0);
         ctrl_data_o       : out std_logic_vector(ctrl_data_width_g-1 downto 0);
@@ -96,11 +95,11 @@ begin
 
     i_dut : lcd_controller
     generic map (
-        buffer_address_g         => x"80000000",
+        buffer0_address_g        => x"80000000",
+        buffer1_address_g        => x"88000000",
         ctrl_data_width_g        => 32,
         ctrl_address_width_g     => 32,
         ctrl_max_burst_size_g    => 32,
-        framebuffer_count_g      => 3,
         color_bits_g             => 4,
         image_width_g            => 320,
         image_height_g           => 240,
@@ -124,8 +123,7 @@ begin
         de_o              => open,
         pclk_o            => open,
         -- frame buffer
-        buffer_i          => "010",
-        buffer_o          => open,
+        buffer_sel_i      => '1',
         ctrl_address_o    => ctrl_address,
         ctrl_data_i       => ctrl_data_r,
         ctrl_data_o       => open,

@@ -14,11 +14,11 @@ use work.fpga_pkg.all;
 
 entity lcd_controller is
 generic (
-    buffer_address_g         : std_logic_vector := x"00000000";
+    buffer0_address_g        : std_logic_vector := x"00000000";
+    buffer1_address_g        : std_logic_vector := x"00000000";
     ctrl_data_width_g        : positive := 32;
     ctrl_address_width_g     : positive := 32;
     ctrl_max_burst_size_g    : positive := 32;
-    framebuffer_count_g      : positive := 3;
     color_bits_g             : positive := 4;
     image_width_g            : positive := 320;
     image_height_g           : positive := 240;
@@ -42,8 +42,7 @@ port (
     de_o              : out std_logic;
     pclk_o            : out std_logic;
     -- frame buffer
-    buffer_i          : in  std_logic_vector(framebuffer_count_g-1 downto 0);
-    buffer_o          : out std_logic_vector(framebuffer_count_g-1 downto 0);
+    buffer_sel_i      : in  std_logic;
     ctrl_address_o    : out std_logic_vector(ctrl_address_width_g-1 downto 0);
     ctrl_data_i       : in  std_logic_vector(ctrl_data_width_g-1 downto 0);
     ctrl_data_o       : out std_logic_vector(ctrl_data_width_g-1 downto 0);
@@ -76,18 +75,20 @@ architecture rtl of lcd_controller is
         empty_o       : out std_logic);
     end component fifo_dual_clock;
 
-    constant address_end_c : std_logic_vector(ctrl_address_width_g-1 downto 0) := std_logic_vector(unsigned(buffer_address_g)+ to_unsigned((image_width_g*image_height_g-ctrl_max_burst_size_g)*4, ctrl_address_width_g));
+    constant address0_end_c : std_logic_vector(ctrl_address_width_g-1 downto 0) := std_logic_vector(unsigned(buffer0_address_g)+ to_unsigned((image_width_g*image_height_g-ctrl_max_burst_size_g)*4, ctrl_address_width_g));
+    constant address1_end_c : std_logic_vector(ctrl_address_width_g-1 downto 0) := std_logic_vector(unsigned(buffer1_address_g)+ to_unsigned((image_width_g*image_height_g-ctrl_max_burst_size_g)*4, ctrl_address_width_g));
 
-    signal buffer_sel_r       : std_logic_vector(framebuffer_count_g-1 downto 0) := std_logic_vector(to_unsigned(1, framebuffer_count_g));
-    signal address_r          : std_logic_vector(ctrl_address_width_g-1 downto 0) := buffer_address_g;
+    signal buffer_sel_r       : std_logic := '0';
+    signal address_r          : std_logic_vector(ctrl_address_width_g-1 downto 0) := buffer0_address_g;
     signal burst_size_r       : std_logic_vector(log2ceil(ctrl_max_burst_size_g)-1 downto 0) := (others => '0');
     signal strobe_r           : std_logic := '0';
     signal burst_counter_r    : unsigned(log2ceil(ctrl_max_burst_size_g) downto 0) := (others => '0');
     signal transfer_pending_r : std_logic := '0';
+    signal buffer_sync_r      : std_logic := '0';
 
-    signal fifo_read_data   : std_logic_vector(3*color_bits_g-1 downto 0);
-    signal fifo_empty       : std_logic;
-    signal fifo_full        : std_logic;
+    signal fifo_read_data     : std_logic_vector(3*color_bits_g-1 downto 0);
+    signal fifo_empty         : std_logic;
+    signal fifo_full          : std_logic;
 
     signal enable_vec_r       : std_logic_vector(2 downto 0) := (others => '0');
     signal enable_timing_r    : std_logic := '0';
@@ -95,9 +96,9 @@ architecture rtl of lcd_controller is
     signal timing_v_r         : std_logic_vector(3 downto 0) := "1000";
     signal timing_h_counter_r : unsigned(log2ceil(image_width_g)-1 downto 0) := (others => '0');
     signal timing_v_counter_r : unsigned(log2ceil(image_height_g)-1 downto 0) := (others => '0');
-    signal hsync_pre_r        : std_logic := '0';
-    signal hsync_r            : std_logic := '0';
-    signal vsync_r            : std_logic := '0';
+    signal hsync_pre_r        : std_logic := '1';
+    signal hsync_r            : std_logic := '1';
+    signal vsync_r            : std_logic := '1';
     signal de_pre_r           : std_logic := '0';
     signal de_r               : std_logic := '0';
     signal de_v_r             : std_logic := '0';
@@ -108,8 +109,17 @@ begin
     begin
         if (rising_edge(clk_i)) then
             if ((fifo_full = '0') and (transfer_pending_r = '0') and (enable_i = '1')) then
-                strobe_r <= '1';
-                transfer_pending_r <= '1';
+                if (buffer_sync_r = '1') then
+                    -- try to recover when DMA was too slow during last image
+                    if (vsync_r = '0') then
+                        transfer_pending_r <= '1';
+                        buffer_sync_r <= '0';
+                        strobe_r <= '1';
+                    end if;
+                else
+                    transfer_pending_r <= '1';
+                    strobe_r <= '1';
+                end if;
                 burst_size_r <= std_logic_vector(to_unsigned(31, burst_size_r'length)); -- can be done with only using 32 word bursts (works for 320*240)
             else
                 strobe_r <= '0';
@@ -121,9 +131,22 @@ begin
                 elsif (burst_counter_r = (unsigned('0' & burst_size_r) + 1)) then
                     burst_counter_r <= (others => '0');
                     transfer_pending_r <= '0';
-                    if (address_r >= address_end_c) then
-                        address_r <= buffer_address_g;
-                        buffer_sel_r <= buffer_sel_r xnor buffer_i;
+                    if (buffer_sel_r = '0') and (address_r >= address0_end_c) then
+                        if (buffer_sel_i = '0') then
+                            address_r <= buffer0_address_g;
+                        else
+                            address_r <= buffer1_address_g;
+                        end if;
+                        buffer_sync_r <= '1';
+                        buffer_sel_r <= buffer_sel_i;
+                    elsif (buffer_sel_r = '1') and (address_r >= address1_end_c) then
+                        if (buffer_sel_i = '0') then
+                            address_r <= buffer0_address_g;
+                        else
+                            address_r <= buffer1_address_g;
+                        end if;
+                        buffer_sync_r <= '1';
+                        buffer_sel_r <= buffer_sel_i;
                     else
                         address_r <= std_logic_vector(unsigned(address_r) + ((unsigned('0' & burst_size_r) + 1) & "00"));
                     end if;
@@ -228,7 +251,6 @@ begin
     de_o <= de_r;
     pclk_o <= not video_clk_i;
 
-    buffer_o <= buffer_sel_r;
     ctrl_address_o <= address_r;
     ctrl_burst_size_o <= burst_size_r;
     ctrl_strobe_o <= strobe_r;

@@ -274,11 +274,11 @@ architecture rtl of lcd_top is
 
     component lcd_controller is
     generic (
-        buffer_address_g         : std_logic_vector;
+        buffer0_address_g        : std_logic_vector;
+        buffer1_address_g        : std_logic_vector;
         ctrl_data_width_g        : positive;
         ctrl_address_width_g     : positive;
         ctrl_max_burst_size_g    : positive;
-        framebuffer_count_g      : positive;
         color_bits_g             : positive;
         image_width_g            : positive;
         image_height_g           : positive;
@@ -302,8 +302,7 @@ architecture rtl of lcd_top is
         de_o              : out std_logic;
         pclk_o            : out std_logic;
         -- frame buffer
-        buffer_i          : in  std_logic_vector(framebuffer_count_g-1 downto 0);
-        buffer_o          : out std_logic_vector(framebuffer_count_g-1 downto 0);
+        buffer_sel_i      : in  std_logic;
         ctrl_address_o    : out std_logic_vector(ctrl_address_width_g-1 downto 0);
         ctrl_data_i       : in  std_logic_vector(ctrl_data_width_g-1 downto 0);
         ctrl_data_o       : out std_logic_vector(ctrl_data_width_g-1 downto 0);
@@ -353,7 +352,7 @@ architecture rtl of lcd_top is
                                     others                          => '0');
     constant register_mask_c      : std_logic_array_32(register_count_c-1 downto 0) :=
                                    (register_address_version_c      => x"ffffffff",
-                                    register_address_test_c         => x"00000007",
+                                    register_address_test_c         => x"0000000f",
                                     register_address_reset_c        => x"00000003",
                                     others                          => x"ffffffff");
 
@@ -680,11 +679,11 @@ begin
 
     i_lcd : lcd_controller
     generic map (
-        buffer_address_g         => x"800000",
+        buffer0_address_g        => x"800000",
+        buffer1_address_g        => x"880000",
         ctrl_data_width_g        => ctrl_data_width_c,
         ctrl_address_width_g     => ctrl_address_width_c,
         ctrl_max_burst_size_g    => ctrl_max_burst_size_c,
-        framebuffer_count_g      => 3,
         color_bits_g             => 4,
         image_width_g            => 320,
         image_height_g           => 240,
@@ -717,8 +716,7 @@ begin
         de_o              => lcd_de_o,
         pclk_o            => lcd_clk_o,
         -- frame buffer
-        buffer_i          => "000",
-        buffer_o          => open,
+        buffer_sel_i      => register_write_data(register_address_test_c)(3),
         ctrl_address_o    => lcd_address,
         ctrl_data_i       => array_extract(master_lcd_c, ctrl_read_data),
         ctrl_data_o       => lcd_data,
