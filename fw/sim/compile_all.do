@@ -17,6 +17,7 @@ if { $::argc != 1 } {
     vcom ../source/clock_converter.vhd -check_synthesis
     vcom ../source/slave_interconnect.vhd -check_synthesis
     vcom ../source/master_interconnect.vhd -check_synthesis
+    vcom ../source/interconnect.vhd -check_synthesis
 
     # eth mac
     vcom ../source/rmii_interface.vhd -check_synthesis
@@ -65,6 +66,7 @@ if { $::argc != 1 } {
 
     # top level
     vcom ../source/audio_top.vhd -check_synthesis
+    vcom ../source/lcd_top.vhd -check_synthesis
 
     # hyper ram functional model
     vcom -work fmf ../testbench/s27kl0641/utilities/gen_utils.vhd

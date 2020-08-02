@@ -197,6 +197,7 @@ set_location_assignment PIN_F15 -to lcd_blue_2_o
 set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to lcd_blue_2_o
 set_location_assignment PIN_F14 -to lcd_disp_o
 set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to lcd_disp_o
+set_global_assignment -name VHDL_FILE ../source/interconnect.vhd
 set_global_assignment -name SDC_FILE ../constraints/lcd.sdc
 set_global_assignment -name VHDL_FILE ../source/slave_interconnect.vhd
 set_global_assignment -name VHDL_FILE ../source/master_interconnect.vhd
