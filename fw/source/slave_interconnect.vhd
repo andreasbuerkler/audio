@@ -48,6 +48,7 @@ architecture rtl of slave_interconnect is
     signal read_data_r            : std_logic_vector(master_data_width_g-1 downto 0) := (others => '0');
     signal ack_r                  : std_logic := '0';
     signal slave_sel_r            : std_logic_vector(address_map_g'length-1 downto 0) := (others => '0');
+    signal write_r                : std_logic := '0';
 
 begin
 
@@ -92,6 +93,7 @@ begin
                 if (vector_or(transfer_in_progress_r) = '0') then
                     burst_counter_r <= unsigned(master_burst_size_i);
                     slave_sel_r <= strobe_a;
+                    write_r <= vector_or(write_a and strobe_a);
                 end if;
             end if;
             for o in 0 to address_map_g'length-1 loop
@@ -99,7 +101,7 @@ begin
                     burst_counter_r <= burst_counter_r - 1;
                 end if;
             end loop;
-            if (((vector_or(slave_ack_i) = '1') and (vector_or(std_logic_vector(burst_counter_r)) = '0')) or (reset_i = '1')) then
+            if (((vector_or(slave_ack_i) = '1') and ((write_r = '1') or (vector_or(std_logic_vector(burst_counter_r)) = '0'))) or (reset_i = '1')) then
                 transfer_in_progress_r <= (others => '0');
                 slave_sel_r <= (others => '0');
             end if;

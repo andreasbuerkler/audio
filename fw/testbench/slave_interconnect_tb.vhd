@@ -124,19 +124,23 @@ begin
                         burst_counter_r <= unsigned(array_extract(i, slave_burst_size));
                         write_r <= slave_write(i);
                         address_r <= to_integer(unsigned(array_extract(i, slave_address))) + 1;
-                    end if;
-                    -- first word
-                    if (slave_write(i) = '1') then
-                        if (to_integer(unsigned(array_extract(i, slave_address))) < 4) then
-                            register_r(to_integer(unsigned(array_extract(i, slave_address)))) <= array_extract(i, slave_data_out);
+
+                        -- first word
+                        if (slave_write(i) = '1') then
+                            if (to_integer(unsigned(array_extract(i, slave_address))) < 4) then
+                                register_r(to_integer(unsigned(array_extract(i, slave_address)))) <= array_extract(i, slave_data_out);
+                            end if;
+                            if (vector_or(std_logic_vector(unsigned(array_extract(i, slave_burst_size)))) = '0') then
+                                slave_ack_r(i) <= '1';
+                            end if;
+                        else
+                            if (to_integer(unsigned(array_extract(i, slave_address))) < 4) then
+                                read_data_r <= register_r(to_integer(unsigned(array_extract(i, slave_address))));
+                            end if;
+                            slave_ack_r(i) <= '1';
                         end if;
-                        slave_ack_r(i) <= '1';
-                    else
-                        if (to_integer(unsigned(array_extract(i, slave_address))) < 4) then
-                            read_data_r <= register_r(to_integer(unsigned(array_extract(i, slave_address))));
-                        end if;
-                        slave_ack_r(i) <= '1';
                     end if;
+
                     -- burst write
                     if ((vector_or(std_logic_vector(burst_counter_r)) = '1') and (write_r = '1')) then
                         burst_counter_r <= burst_counter_r - 1;
@@ -144,7 +148,9 @@ begin
                         if (address_r < 4) then
                             register_r(address_r) <= array_extract(i, slave_data_out);
                         end if;
-                        slave_ack_r(i) <= '1';
+                        if (burst_counter_r = to_unsigned(1, burst_counter_r'length)) then
+                            slave_ack_r(i) <= '1';
+                        end if;
                     end if;
                 end if;
                 -- burst read
@@ -183,11 +189,14 @@ begin
                 master_write_data_r <= (others => '0');
                 master_strobe_r <= '0';
                 master_write_r <= '0';
-                if (master_ack = '0') then
-                    wait until master_ack = '1';
+                if (i /= size-1) then
+                    wait until rising_edge(clk);
                 end if;
-                wait until rising_edge(clk);
             end loop;
+            if (master_ack = '0') then
+                wait until master_ack = '1';
+            end if;
+            wait until rising_edge(clk);
         end procedure write_word;       
         procedure read_word (address : in  std_logic_vector;
                              size    : in  positive) is
