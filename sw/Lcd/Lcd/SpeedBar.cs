@@ -13,22 +13,22 @@ namespace Lcd
             }
             if ((posY == 0) || (posY == _totalHeight - 1) || (posX == 0) || (posX == _totalWidth - 1))
             {
-                pixel = _colorGrey;
+                pixel = Colors._grey;
                 return true;
             }
             if ((posY == 1) || (posY == _totalHeight - 2) || (posX == 1) || (posX == _totalWidth - 2) || ((posX % 40) == 0))
             {
-                pixel = _colorWhite;
+                pixel = Colors._white;
                 return true;
             }
             int barRight = _speed * _totalWidth / _maxSpeed;
             if (posX > barRight)
             {
-                pixel = _colorBlack;
+                pixel = Colors._black;
             }
             else
             {
-                pixel = _colorBlueBright;
+                pixel = Colors._blueBright;
             }
             return true;
         }
@@ -49,10 +49,6 @@ namespace Lcd
             }
         }
 
-        private const UInt32 _colorBlack = 0x000;
-        private const UInt32 _colorGrey = 0xCCC;
-        private const UInt32 _colorWhite = 0xFFF;
-        private const UInt32 _colorBlueBright = 0x79C;
         private const int _totalWidth = 320;
         private const int _totalHeight = 45;
         private const int _minSpeed = 0;

@@ -9,50 +9,50 @@ namespace Lcd
         public void Build(out Dictionary<byte, Character> characterList)
         {
             characterList = new Dictionary<byte, Character>();
-            characterList.Add(Encoding.UTF8.GetBytes(" ")[0], new Character(_character_ ));
-            characterList.Add(Encoding.UTF8.GetBytes("0")[0], new Character(_character_0));
-            characterList.Add(Encoding.UTF8.GetBytes("1")[0], new Character(_character_1));
-            characterList.Add(Encoding.UTF8.GetBytes("2")[0], new Character(_character_2));
-            characterList.Add(Encoding.UTF8.GetBytes("3")[0], new Character(_character_3));
-            characterList.Add(Encoding.UTF8.GetBytes("4")[0], new Character(_character_4));
-            characterList.Add(Encoding.UTF8.GetBytes("5")[0], new Character(_character_5));
-            characterList.Add(Encoding.UTF8.GetBytes("6")[0], new Character(_character_6));
-            characterList.Add(Encoding.UTF8.GetBytes("7")[0], new Character(_character_7));
-            characterList.Add(Encoding.UTF8.GetBytes("8")[0], new Character(_character_8));
-            characterList.Add(Encoding.UTF8.GetBytes("9")[0], new Character(_character_9));
+            characterList.Add(Encoding.UTF8.GetBytes(" ")[0], new Character(_character_,  _characterWidth, _characterHeight));
+            characterList.Add(Encoding.UTF8.GetBytes("0")[0], new Character(_character_0, _characterWidth, _characterHeight));
+            characterList.Add(Encoding.UTF8.GetBytes("1")[0], new Character(_character_1, _characterWidth, _characterHeight));
+            characterList.Add(Encoding.UTF8.GetBytes("2")[0], new Character(_character_2, _characterWidth, _characterHeight));
+            characterList.Add(Encoding.UTF8.GetBytes("3")[0], new Character(_character_3, _characterWidth, _characterHeight));
+            characterList.Add(Encoding.UTF8.GetBytes("4")[0], new Character(_character_4, _characterWidth, _characterHeight));
+            characterList.Add(Encoding.UTF8.GetBytes("5")[0], new Character(_character_5, _characterWidth, _characterHeight));
+            characterList.Add(Encoding.UTF8.GetBytes("6")[0], new Character(_character_6, _characterWidth, _characterHeight));
+            characterList.Add(Encoding.UTF8.GetBytes("7")[0], new Character(_character_7, _characterWidth, _characterHeight));
+            characterList.Add(Encoding.UTF8.GetBytes("8")[0], new Character(_character_8, _characterWidth, _characterHeight));
+            characterList.Add(Encoding.UTF8.GetBytes("9")[0], new Character(_character_9, _characterWidth, _characterHeight));
 
-            characterList.Add(Encoding.UTF8.GetBytes("a")[0], new Character(_character_a));
-            characterList.Add(Encoding.UTF8.GetBytes("b")[0], new Character(_character_b));
-            characterList.Add(Encoding.UTF8.GetBytes("c")[0], new Character(_character_c));
-            characterList.Add(Encoding.UTF8.GetBytes("d")[0], new Character(_character_d));
-            characterList.Add(Encoding.UTF8.GetBytes("e")[0], new Character(_character_e));
-            characterList.Add(Encoding.UTF8.GetBytes("f")[0], new Character(_character_f));
-            characterList.Add(Encoding.UTF8.GetBytes("g")[0], new Character(_character_g));
-            characterList.Add(Encoding.UTF8.GetBytes("h")[0], new Character(_character_h));
-            characterList.Add(Encoding.UTF8.GetBytes("i")[0], new Character(_character_i));
-            characterList.Add(Encoding.UTF8.GetBytes("j")[0], new Character(_character_j));
-            characterList.Add(Encoding.UTF8.GetBytes("k")[0], new Character(_character_k));
-            characterList.Add(Encoding.UTF8.GetBytes("l")[0], new Character(_character_l));
-            characterList.Add(Encoding.UTF8.GetBytes("m")[0], new Character(_character_m));
-            characterList.Add(Encoding.UTF8.GetBytes("n")[0], new Character(_character_n));
-            characterList.Add(Encoding.UTF8.GetBytes("o")[0], new Character(_character_o));
-            characterList.Add(Encoding.UTF8.GetBytes("p")[0], new Character(_character_p));
-            characterList.Add(Encoding.UTF8.GetBytes("q")[0], new Character(_character_q));
-            characterList.Add(Encoding.UTF8.GetBytes("r")[0], new Character(_character_r));
-            characterList.Add(Encoding.UTF8.GetBytes("s")[0], new Character(_character_s));
-            characterList.Add(Encoding.UTF8.GetBytes("t")[0], new Character(_character_t));
-            characterList.Add(Encoding.UTF8.GetBytes("u")[0], new Character(_character_u));
-            characterList.Add(Encoding.UTF8.GetBytes("v")[0], new Character(_character_v));
-            characterList.Add(Encoding.UTF8.GetBytes("w")[0], new Character(_character_w));
-            characterList.Add(Encoding.UTF8.GetBytes("x")[0], new Character(_character_x));
-            characterList.Add(Encoding.UTF8.GetBytes("y")[0], new Character(_character_y));
-            characterList.Add(Encoding.UTF8.GetBytes("z")[0], new Character(_character_z));
+            characterList.Add(Encoding.UTF8.GetBytes("a")[0], new Character(_character_a, _characterWidth, _characterHeight));
+            characterList.Add(Encoding.UTF8.GetBytes("b")[0], new Character(_character_b, _characterWidth, _characterHeight));
+            characterList.Add(Encoding.UTF8.GetBytes("c")[0], new Character(_character_c, _characterWidth, _characterHeight));
+            characterList.Add(Encoding.UTF8.GetBytes("d")[0], new Character(_character_d, _characterWidth, _characterHeight));
+            characterList.Add(Encoding.UTF8.GetBytes("e")[0], new Character(_character_e, _characterWidth, _characterHeight));
+            characterList.Add(Encoding.UTF8.GetBytes("f")[0], new Character(_character_f, _characterWidth, _characterHeight));
+            characterList.Add(Encoding.UTF8.GetBytes("g")[0], new Character(_character_g, _characterWidth, _characterHeight));
+            characterList.Add(Encoding.UTF8.GetBytes("h")[0], new Character(_character_h, _characterWidth, _characterHeight));
+            characterList.Add(Encoding.UTF8.GetBytes("i")[0], new Character(_character_i, _characterWidth, _characterHeight));
+            characterList.Add(Encoding.UTF8.GetBytes("j")[0], new Character(_character_j, _characterWidth, _characterHeight));
+            characterList.Add(Encoding.UTF8.GetBytes("k")[0], new Character(_character_k, _characterWidth, _characterHeight));
+            characterList.Add(Encoding.UTF8.GetBytes("l")[0], new Character(_character_l, _characterWidth, _characterHeight));
+            characterList.Add(Encoding.UTF8.GetBytes("m")[0], new Character(_character_m, _characterWidth, _characterHeight));
+            characterList.Add(Encoding.UTF8.GetBytes("n")[0], new Character(_character_n, _characterWidth, _characterHeight));
+            characterList.Add(Encoding.UTF8.GetBytes("o")[0], new Character(_character_o, _characterWidth, _characterHeight));
+            characterList.Add(Encoding.UTF8.GetBytes("p")[0], new Character(_character_p, _characterWidth, _characterHeight));
+            characterList.Add(Encoding.UTF8.GetBytes("q")[0], new Character(_character_q, _characterWidth, _characterHeight));
+            characterList.Add(Encoding.UTF8.GetBytes("r")[0], new Character(_character_r, _characterWidth, _characterHeight));
+            characterList.Add(Encoding.UTF8.GetBytes("s")[0], new Character(_character_s, _characterWidth, _characterHeight));
+            characterList.Add(Encoding.UTF8.GetBytes("t")[0], new Character(_character_t, _characterWidth, _characterHeight));
+            characterList.Add(Encoding.UTF8.GetBytes("u")[0], new Character(_character_u, _characterWidth, _characterHeight));
+            characterList.Add(Encoding.UTF8.GetBytes("v")[0], new Character(_character_v, _characterWidth, _characterHeight));
+            characterList.Add(Encoding.UTF8.GetBytes("w")[0], new Character(_character_w, _characterWidth, _characterHeight));
+            characterList.Add(Encoding.UTF8.GetBytes("x")[0], new Character(_character_x, _characterWidth, _characterHeight));
+            characterList.Add(Encoding.UTF8.GetBytes("y")[0], new Character(_character_y, _characterWidth, _characterHeight));
+            characterList.Add(Encoding.UTF8.GetBytes("z")[0], new Character(_character_z, _characterWidth, _characterHeight));
 
-            characterList.Add(Encoding.UTF8.GetBytes("%")[0], new Character(_character_s0));
-            characterList.Add(Encoding.UTF8.GetBytes("°")[0], new Character(_character_s1));
-            characterList.Add(Encoding.UTF8.GetBytes(":")[0], new Character(_character_s2));
-            characterList.Add(Encoding.UTF8.GetBytes(".")[0], new Character(_character_s3));
-            characterList.Add(Encoding.UTF8.GetBytes("-")[0], new Character(_character_s4));
+            characterList.Add(Encoding.UTF8.GetBytes("%")[0], new Character(_character_s0, _characterWidth, _characterHeight));
+            characterList.Add(Encoding.UTF8.GetBytes("°")[0], new Character(_character_s1, _characterWidth, _characterHeight));
+            characterList.Add(Encoding.UTF8.GetBytes(":")[0], new Character(_character_s2, _characterWidth, _characterHeight));
+            characterList.Add(Encoding.UTF8.GetBytes(".")[0], new Character(_character_s3, _characterWidth, _characterHeight));
+            characterList.Add(Encoding.UTF8.GetBytes("-")[0], new Character(_character_s4, _characterWidth, _characterHeight));
         }
 
         // one bit for each pixel / one byte for each line
@@ -73,6 +73,9 @@ namespace Lcd
         // 00000000 0x00
         // 00000000 0x00
         // 00000000 0x00
+
+        private const int _characterWidth = 1;
+        private const int _characterHeight = 15;
 
         private Byte[] _character_  = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
         private Byte[] _character_0 = {0x00, 0x3C, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x3C, 0x00, 0x00, 0x00, 0x00};

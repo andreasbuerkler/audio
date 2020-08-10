@@ -3,8 +3,13 @@
     class Character
     {
 
-        public Character(byte[] byteArray)
+        public Character(byte[] byteArray, int width, int height)
         {
+            _width = width;
+            _height = height;
+            _size = _height * _width;
+            _byteArray = new byte[_size];
+
             if (byteArray.Length == _size) {
                 _byteArray = byteArray;
             } else {
@@ -14,8 +19,9 @@
             }
         }
 
-        public byte GetLine(int index)
+        public byte GetLine(int posY, int posX)
         {
+            int index = (posY * _width) + posX;
             if ((index >= 0) && (index < _size)) {
                 return _byteArray[index];
             } else {
@@ -23,8 +29,10 @@
             }
         }
 
-        private const int _size = 15;
-        private byte[] _byteArray = new byte[_size];
+        private int _width;
+        private int _height;
+        private int _size;
+        private byte[] _byteArray;
 
     }
 }

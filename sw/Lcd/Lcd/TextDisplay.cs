@@ -8,8 +8,8 @@ namespace Lcd
     {
         public TextDisplay()
         {
-            CharacterFactory characterFactor = new CharacterFactory();
-            characterFactor.Build(out _characterList);
+            CharacterFactory characterFactory = new CharacterFactory();
+            characterFactory.Build(out _characterList);
             ClearText();
         }
 
@@ -56,7 +56,7 @@ namespace Lcd
             int offsetY = posY % _characterHeight;
             Character character;
             if (_characterList.TryGetValue(_textArray[characterY, characterX], out character)) {
-                byte line = character.GetLine(offsetY);
+                byte line = character.GetLine(offsetY, 0);
                 pixel = (((line >> offsetX) & 0x01) == 0x01);
                 return true;
             } else {

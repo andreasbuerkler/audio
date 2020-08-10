@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Threading;
+using System.Text;
 
 namespace Lcd
 {
@@ -8,16 +8,21 @@ namespace Lcd
     {
         public  Framebuffer()
         {
-            _bufferDisplay = new uint[_bufferSize / 4];
+            _bufferDisplay = new UInt32[_bufferSize / 4];
             _text = new TextDisplay();
             _background = new Background();
             _speedBar = new SpeedBar();
+
+            // create gear character
+            _gear = Encoding.UTF8.GetBytes("N")[0];
+            BigCharacterFactory bigCharacterFactory = new BigCharacterFactory();
+            bigCharacterFactory.Build(out _gearCharacterList);
 
             // init background
             _background.GetBackground(out _bufferBackground);
 
             // init buffer with unused color to force update whole image
-            Array.Fill(_bufferDisplay, _colorGreen);
+            Array.Fill(_bufferDisplay, Colors._green);
         }
 
         public bool SetText(string text, int posY, int posX)
@@ -28,6 +33,11 @@ namespace Lcd
         public void SetSpeed(int speed)
         {
             _speedBar.SetSpeed(speed);
+        }
+
+        public void SetGear(byte gear)
+        {
+            _gear = gear;
         }
 
         private void CreateBuffer(out UInt32[] buffer)
@@ -46,6 +56,29 @@ namespace Lcd
                         _speedBar.GetPixel(y, x, out pixel);
                         buffer[wordIndex] = pixel;
                     }
+                    else if ((y > 127) && (y < 187) && (x > 136) && (x < 184))
+                    {
+                        // write gear to buffer
+                        Character character;
+                        if (_gearCharacterList.TryGetValue(_gear, out character))
+                        {
+                            int offsetX = 7 - ((x-136) % 8);
+                            byte line = character.GetLine(y - 127, (x - 136)/(8));
+                            bool pixel = (((line >> offsetX) & 0x01) == 0x01);
+                            if (pixel)
+                            {
+                                buffer[wordIndex] = Colors._white;
+                            }
+                            else
+                            {
+                                buffer[wordIndex] = Colors._black;
+                            }
+                        }
+                        else
+                        {
+                            buffer[wordIndex] = Colors._black;
+                        }
+                    }
                     else
                     {
                         // write text to buffer
@@ -53,7 +86,7 @@ namespace Lcd
                         _text.GetPixel(y, x, out pixel);
                         if (pixel)
                         {
-                            buffer[wordIndex] = 0xFFF;
+                            buffer[wordIndex] = Colors._white;
                         }
                         else
                         {
@@ -100,9 +133,26 @@ namespace Lcd
                         return false;
                     }
                     // prevent from FIFO overflow
-                    if (addressOffset % 4096 == 0)
+                    _sentBytes += _maxBytesPerPacket;
+                    if (_sentBytes >= 10000)
                     {
-                        Thread.Sleep(1);
+                        _sentBytes = 0;
+                        // workaround to handle 100mbit receiver (read id)
+                        UInt32 receiveData;
+                        if (!ethInst.Read32(0, out receiveData, out errorCode))
+                        {
+                            return false;
+                        }
+                        if (errorCode != Eth._ERROR_SUCCESS)
+                        {
+                            Console.WriteLine("\nErrorCode = " + errorCode);
+                            return false;
+                        }
+                        if (receiveData != 0xBEEF0123)
+                        {
+                            Console.WriteLine("\nID wrong");
+                            return false;
+                        }
                     }
                 }
             }
@@ -112,7 +162,6 @@ namespace Lcd
             return true;
         }
 
-        private const byte _colorGreen = 0x0F0;
         private const UInt32 _bufferAddress = 0x00800000;
         private const int _imageWidth = 320;
         private const int _imageHeight = 240;
@@ -121,7 +170,10 @@ namespace Lcd
         private TextDisplay _text;
         private Background _background;
         private SpeedBar _speedBar;
+        private byte _gear;
+        private Dictionary<byte, Character> _gearCharacterList;
         private UInt32[] _bufferDisplay;
         private UInt32[] _bufferBackground;
+        private UInt32 _sentBytes = 0;
     }
 }

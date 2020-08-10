@@ -80,41 +80,9 @@ namespace Lcd
         static void initMem(Eth ethInst)
         {
             Console.Write("\n");
-            Framebuffer buf = new Framebuffer();
-            //buf.SetText("0123456789", 1, 5);
-            //buf.SetText("abcdefghijklmnopqrstuvwxyz", 2, 5);
-            //buf.SetText("-.:°%", 3, 5);
-            buf.SetText("time 00:00.000", 5, 13);
-            buf.SetText("best 00:00.000", 7, 13);
-            buf.SetText("pos 12", 15, 17);
-            buf.SetText("96° 2.1bar", 9, 5);
-            buf.SetText("96° 2.1bar", 11, 5);
-            buf.SetText("96° 2.1bar", 9, 25);
-            buf.SetText("96° 2.1bar", 11, 25);
-            buf.SetText("120 kph", 5, 4);
-            buf.SetText("23 lap", 7, 5);
-            buf.SetText("12.3 l", 5, 33);
-            buf.SetText("4567 rpm", 7, 31);
-            buf.SetText("tc   3", 13, 25);
-            buf.SetText("abs  3", 13, 33);
-            buf.SetText("bias   63%", 15, 25);
-            buf.SetText("296°c", 13, 2);
-            buf.SetText("296°c", 15, 2);
-            buf.SetText("296°c", 13, 10);
-            buf.SetText("296°c", 15, 10);
-            buf.SetText("gear", 13, 18);
-
-            int speed = 0;
-            while (true)
-            {
-                buf.SetSpeed(speed);
-                buf.UpdateBuffer(ethInst);
-                speed += 100;
-                if (speed > 8000)
-                {
-                    speed = 0;
-                }
-            }
+            VideoHandler handle = new VideoHandler(ethInst);
+            handle.Enable(true);
+            while (true);
         }
 
         static void i2cTest(I2c i2cInst, Monitor monitorInst) {
@@ -139,9 +107,9 @@ namespace Lcd
         }
         static void Main(string[] args) {
             Console.WriteLine("---------- Test ----------");
-        //    Acc test = new Acc();
-        //    test.PrintPhysics();
-        //    return;
+       //     Acc test = new Acc();
+       //     test.PrintPhysics();
+       //     return;
 
             Eth ethInst = new Eth(_ipAddress, _udpPort);
             I2c i2cInst = new I2c(ethInst);

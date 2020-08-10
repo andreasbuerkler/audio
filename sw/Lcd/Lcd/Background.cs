@@ -27,25 +27,25 @@ namespace Lcd
 
         private void AddTile(UInt32 verticalTileNr, UInt32 horizontalTileNr, bool top, bool bottom, bool left, bool right, int colorCode, ref UInt32[] background)
         {
-            UInt32 color = _colorBlack;
-            UInt32 colorBright = _colorBlack;
-            UInt32 colorDark = _colorBlack;
+            UInt32 color = Colors._black;
+            UInt32 colorBright = Colors._black;
+            UInt32 colorDark = Colors._black;
             switch (colorCode)
             {
                 case _colorIndexBlue:
-                    color = _colorBlue;
-                    colorBright = _colorBlueBright;
-                    colorDark = _colorBlueDark;
+                    color = Colors._blue;
+                    colorBright = Colors._blueBright;
+                    colorDark = Colors._blueDark;
                     break;
                 case _colorIndexYellow:
-                    color = _colorYellow;
-                    colorBright = _colorYellowBright;
-                    colorDark = _colorYellowDark;
+                    color = Colors._yellow;
+                    colorBright = Colors._yellowBright;
+                    colorDark = Colors._yellowDark;
                     break;
                 case _colorIndexWhite:
-                    color = _colorBlack;
-                    colorBright = _colorWhite;
-                    colorDark = _colorGrey;
+                    color = Colors._black;
+                    colorBright = Colors._white;
+                    colorDark = Colors._grey;
                     break;
                 default:
                     break;
@@ -70,7 +70,7 @@ namespace Lcd
                 {
                     UInt32 verticalOffset = verticalTileNr * _tileHeight;
                     UInt32 horizontalOffset = horizontalTileNr * _tileWidth + offset;
-                    background[verticalOffset * totalWidth + horizontalOffset] = _colorBlack;
+                    background[verticalOffset * totalWidth + horizontalOffset] = Colors._black;
                     verticalOffset += 1;
                     if ((left ? (offset >= 0) : (offset >= 1)) && (right ? (offset < _tileWidth) : (offset < (_tileWidth - 1))))
                     {
@@ -91,7 +91,7 @@ namespace Lcd
                 {
                     UInt32 verticalOffset = verticalTileNr * _tileHeight + _tileHeight - 1;
                     UInt32 horizontalOffset = horizontalTileNr * _tileWidth + offset;
-                    background[verticalOffset * totalWidth + horizontalOffset] = _colorBlack;
+                    background[verticalOffset * totalWidth + horizontalOffset] = Colors._black;
                     verticalOffset -= 1;
                     if ((left ? (offset >= 0) : (offset >= 1)) && (right ? (offset < _tileWidth) : (offset < (_tileWidth - 1))))
                     {
@@ -112,7 +112,7 @@ namespace Lcd
                 {
                     UInt32 verticalOffset = verticalTileNr * _tileHeight + offset;
                     UInt32 horizontalOffset = horizontalTileNr * _tileWidth;
-                    background[verticalOffset * totalWidth + horizontalOffset] = _colorBlack;
+                    background[verticalOffset * totalWidth + horizontalOffset] = Colors._black;
                     horizontalOffset += 1;
                     if ((top ? (offset >= 0) : (offset >= 1)) && (bottom ? (offset < _tileHeight) : (offset < (_tileHeight - 1))))
                     {
@@ -133,7 +133,7 @@ namespace Lcd
                 {
                     UInt32 verticalOffset = verticalTileNr * _tileHeight + offset;
                     UInt32 horizontalOffset = horizontalTileNr * _tileWidth + _tileWidth - 1;
-                    background[verticalOffset * totalWidth + horizontalOffset] = _colorBlack;
+                    background[verticalOffset * totalWidth + horizontalOffset] = Colors._black;
                     horizontalOffset -= 1;
                     if ((top ? (offset >= 0) : (offset >= 1)) && (bottom ? (offset < _tileHeight) : (offset < (_tileHeight - 1))))
                     {
@@ -147,18 +147,6 @@ namespace Lcd
                 }
             }
         }
-
-        private const UInt32 _colorBlack = 0x000;
-        private const UInt32 _colorGrey = 0xCCC;
-        private const UInt32 _colorWhite = 0xFFF;
-
-        private const UInt32 _colorBlue = 0x58A;
-        private const UInt32 _colorBlueDark = 0x456;
-        private const UInt32 _colorBlueBright = 0x79C;
-
-        private const UInt32 _colorYellow = 0xCB6;
-        private const UInt32 _colorYellowDark = 0x663;
-        private const UInt32 _colorYellowBright = 0x985;
 
         private const int _tileWidth = 32;
         private const int _tileHeight = 30;
