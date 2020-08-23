@@ -81,7 +81,6 @@ namespace Lcd
         {
             Console.Write("\n");
             VideoHandler handle = new VideoHandler(ethInst);
-            handle.Enable(true);
             while (true);
         }
 
@@ -107,9 +106,6 @@ namespace Lcd
         }
         static void Main(string[] args) {
             Console.WriteLine("---------- Test ----------");
-       //     Acc test = new Acc();
-       //     test.PrintPhysics();
-       //     return;
 
             Eth ethInst = new Eth(_ipAddress, _udpPort);
             I2c i2cInst = new I2c(ethInst);

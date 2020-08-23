@@ -9,60 +9,54 @@ namespace Lcd
     {
         public Acc()
         {
-            _physicsFile = MemoryMappedFile.OpenExisting("Local\\acpmf_physics", MemoryMappedFileRights.Read, HandleInheritability.None);
-            _graphicsFile = MemoryMappedFile.OpenExisting("Local\\acpmf_graphics", MemoryMappedFileRights.Read, HandleInheritability.None);
-            _physicsStream = _physicsFile.CreateViewStream(0L, 0L, MemoryMappedFileAccess.Read);
-            _graphicsStream = _graphicsFile.CreateViewStream(0L, 0L, MemoryMappedFileAccess.Read);
         }
 
-        public void PrintPhysics ()
+        public bool TryOpen()
         {
-            while (true) {
-                PhysikInfo pInfo = GetPhysics();
-                GraphicInfo gInfo = GetGraphics();
+            try
+            {
+                _physicsFile = MemoryMappedFile.OpenExisting(_physicsFileName, MemoryMappedFileRights.Read, HandleInheritability.None);
+            }
+            catch
+            {
+                return false;
+            }
+            try
+            {
+                _graphicsFile = MemoryMappedFile.OpenExisting(_graphicsFileName, MemoryMappedFileRights.Read, HandleInheritability.None);
+            }
+            catch
+            {
+                _physicsFile.Dispose();
+                return false;
+            }
+            try
+            {
+                _physicsStream = _physicsFile.CreateViewStream(0L, 0L, MemoryMappedFileAccess.Read);
+                _graphicsStream = _graphicsFile.CreateViewStream(0L, 0L, MemoryMappedFileAccess.Read);
+            }
+            catch
+            {
+                _physicsFile.Dispose();
+                _graphicsFile.Dispose();
+                return false;
+            }
+            return true;
+        }
 
-                Console.WriteLine("fuel: " + pInfo.fuel);
-                Console.WriteLine("gear: " + pInfo.gear);
-                Console.WriteLine("rpm: " + pInfo.rpm);
-                Console.WriteLine("speedKmh: " + pInfo.speedKmh);
-
-                Console.WriteLine("wheelPressure[0]: " + pInfo.wheelPressure[0]);
-                Console.WriteLine("wheelPressure[1]: " + pInfo.wheelPressure[1]);
-                Console.WriteLine("wheelPressure[2]: " + pInfo.wheelPressure[2]);
-                Console.WriteLine("wheelPressure[3]: " + pInfo.wheelPressure[3]);
-
-                Console.WriteLine("tyreCoreTemp[0]: " + pInfo.tyreCoreTemp[0]);
-                Console.WriteLine("tyreCoreTemp[1]: " + pInfo.tyreCoreTemp[1]);
-                Console.WriteLine("tyreCoreTemp[2]: " + pInfo.tyreCoreTemp[2]);
-                Console.WriteLine("tyreCoreTemp[3]: " + pInfo.tyreCoreTemp[3]);
-
-                Console.WriteLine("brakeTemp[0]: " + pInfo.brakeTemp[0]);
-                Console.WriteLine("brakeTemp[1]: " + pInfo.brakeTemp[1]);
-                Console.WriteLine("brakeTemp[2]: " + pInfo.brakeTemp[2]);
-                Console.WriteLine("brakeTemp[3]: " + pInfo.brakeTemp[3]);
-
-                Console.WriteLine("carDamage[0]: " + pInfo.carDamage[0]);
-                Console.WriteLine("carDamage[1]: " + pInfo.carDamage[1]);
-                Console.WriteLine("carDamage[2]: " + pInfo.carDamage[2]);
-                Console.WriteLine("carDamage[3]: " + pInfo.carDamage[3]);
-                Console.WriteLine("carDamage[4]: " + pInfo.carDamage[4]);
-
-                Console.WriteLine("brakeBias: " + pInfo.brakeBias);
-                Console.WriteLine("tcInAction: " + pInfo.tcInAction);
-                Console.WriteLine("absInAction: " + pInfo.absInAction);
-
-                Console.WriteLine("position: " + gInfo.position);
-                Console.WriteLine("iCurrentTime: " + gInfo.iCurrentTime);
-                Console.WriteLine("iLastTime: " + gInfo.iLastTime);
-                Console.WriteLine("iBestTime: " + gInfo.iBestTime);
-                Console.WriteLine("numberOfLaps: " + gInfo.numberOfLaps);
-                Console.WriteLine("Tc: " + gInfo.Tc);
-                Console.WriteLine("Abs: " + gInfo.Abs);
-                Console.WriteLine("iDeltaLapTime: " + gInfo.iDeltaLapTime);
-                Console.WriteLine("isDeltaPositive: " + gInfo.isDeltaPositive);
-                Console.WriteLine("isValidLap: " + gInfo.isValidLap);
-
-                Thread.Sleep(1000);
+        public bool GetData (out PhysikInfo pInfo, out GraphicInfo gInfo)
+        {
+            try
+            {
+                pInfo = GetPhysics();
+                gInfo = GetGraphics();
+                return true;
+            }
+            catch
+            {
+                pInfo = new PhysikInfo();
+                gInfo = new GraphicInfo();
+                return false;
             }
         }
 
@@ -122,8 +116,8 @@ namespace Lcd
             info.iLastTime = GetInt(_graphicsStream, 0x90);
             info.iBestTime = GetInt(_graphicsStream, 0x94);
             info.numberOfLaps = GetInt(_graphicsStream, 0xAC);
-            info.Tc = GetInt(_graphicsStream, 0x4F4);
-            info.Abs = GetInt(_graphicsStream, 0x500);
+            info.tc = GetInt(_graphicsStream, 0x4F4);
+            info.abs = GetInt(_graphicsStream, 0x500);
             info.iDeltaLapTime = GetInt(_graphicsStream, 0x54E);
             info.isDeltaPositive = GetInt(_graphicsStream, 0x578);
             info.isValidLap = GetInt(_graphicsStream, 0x580);
@@ -151,13 +145,15 @@ namespace Lcd
             public int iLastTime;
             public int iBestTime;
             public int numberOfLaps;
-            public int Tc;
-            public int Abs;
+            public int tc;
+            public int abs;
             public int iDeltaLapTime;
             public int isDeltaPositive;
             public int isValidLap;
         }
 
+        private const string _physicsFileName = "Local\\acpmf_physics";
+        private const string _graphicsFileName = "Local\\acpmf_graphics";
         private MemoryMappedFile _physicsFile;
         private MemoryMappedFile _graphicsFile;
         private MemoryMappedViewStream _physicsStream;
