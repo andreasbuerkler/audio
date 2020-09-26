@@ -6,18 +6,48 @@ namespace Lcd
 {
     class VideoHandler
     {
-        public VideoHandler(Eth ethInst)
+        public VideoHandler(Eth ethInst, Monitor monitorInst)
         {
             _enable = false;
             _ethernet = ethInst;
             _frameBuffer = new Framebuffer();
             _acc = new Acc();
+            _monitor = monitorInst;
             _updateTimer = new System.Timers.Timer(16.666);
             _updateTimer.Elapsed += TimerElapsed;
             _updateTimer.AutoReset = true;
             _updateTimer.Enabled = true;
         }
 
+        private void ShowSplashScreen()
+        {
+            Monitor.MonitorStatus status;
+
+            _monitor.GetStatus(out status);
+            string ch0VoltageString = String.Format("0: {0,6:0.00}v", status.ch0.voltage);
+            string ch0CurrentString = String.Format("0: {0,6:0.00}mA", status.ch0.current);
+            float ch0Power = status.ch0.voltage * status.ch0.current;
+            string ch1VoltageString = String.Format("1: {0,6:0.00}v", status.ch1.voltage);
+            string ch1CurrentString = String.Format("1: {0,6:0.00}mA", status.ch1.current);
+            float ch1Power = status.ch1.voltage * status.ch1.current;
+            string ch2VoltageString = String.Format("2: {0,6:0.00}v", status.ch2.voltage);
+            string ch2CurrentString = String.Format("2: {0,6:0.00}mA", status.ch2.current);
+            float ch2Power = status.ch2.voltage * status.ch2.current;
+            float totalPower = (ch0Power + ch1Power + ch2Power)/1000;
+            string totalPowerString = String.Format("{0,6:0.00}w", totalPower);
+
+            _frameBuffer.SetText(totalPowerString, 5, 29);
+            _frameBuffer.SetText(ch0VoltageString, 5, 1);
+            _frameBuffer.SetText(ch0CurrentString, 7, 1);
+            _frameBuffer.SetText(ch1VoltageString, 9, 5);
+            _frameBuffer.SetText(ch1CurrentString, 11, 5);
+            _frameBuffer.SetText(ch2VoltageString, 9, 25);
+            _frameBuffer.SetText(ch2CurrentString, 11, 25);
+            _frameBuffer.SetText("waiting ...", 5, 14);
+            _waitingBar += 50;
+            _frameBuffer.SetSpeed(_waitingBar%8000);
+            _frameBuffer.UpdateBuffer(_ethernet);
+        }
         private void TimerElapsed(Object source, ElapsedEventArgs e)
         {
             if (_lock)
@@ -28,6 +58,8 @@ namespace Lcd
 
             if (!_enable)
             {
+                ShowSplashScreen();
+
                 if (_acc.TryOpen())
                 {
                     _enable = true;
@@ -162,6 +194,8 @@ namespace Lcd
         private Framebuffer _frameBuffer;
         private Eth _ethernet;
         private Acc _acc;
+        private Monitor _monitor;
+        private int _waitingBar = 0;
         private bool _enable = false;
         private bool _lock = false;
     }

@@ -97,6 +97,28 @@ namespace Lcd
             }
         }
 
+        private bool CheckIfUpdateNeeded(UInt32[] buffer, UInt32 addressOffset)
+        {
+            for (UInt32 index = 0; index < _maxBytesPerPacket; index += 4)
+            {
+                UInt32 pixelIndex = 0;
+                if (_flipImage)
+                {
+                    // flip image
+                    pixelIndex = ((_bufferSize - 1) - (addressOffset + index)) / 4;
+                }
+                else
+                {
+                    pixelIndex = (addressOffset + index) / 4;
+                }
+                if (buffer[pixelIndex] != _bufferDisplay[pixelIndex])
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         public bool UpdateBuffer(Eth ethInst)
         {
             UInt32[] bufferNext;
@@ -106,15 +128,7 @@ namespace Lcd
             for (UInt32 addressOffset = 0; addressOffset < _bufferSize; addressOffset += _maxBytesPerPacket)
             {
                 // check buffer for changes
-                bool updateBuffer = false;
-                for (UInt32 index = 0; index < _maxBytesPerPacket; index+=4)
-                {
-                    if (bufferNext[(addressOffset + index) / 4] != _bufferDisplay[(addressOffset + index) / 4])
-                    {
-                        updateBuffer = true;
-                        break;
-                    }
-                }
+                bool updateBuffer = CheckIfUpdateNeeded(bufferNext, addressOffset);
 
                 // write buffer
                 if (updateBuffer)
@@ -124,7 +138,15 @@ namespace Lcd
                     List<UInt32> writeData = new List<UInt32>();
                     for (UInt32 index = 0; index < _maxBytesPerPacket; index += 4)
                     {
-                        writeData.Add(bufferNext[(addressOffset + index) / 4]);
+                        if (_flipImage)
+                        {
+                            // flip image
+                            writeData.Add(bufferNext[((_bufferSize - 1) - (addressOffset + index)) / 4]);
+                        }
+                        else
+                        {
+                            writeData.Add(bufferNext[(addressOffset + index) / 4]);
+                        }
                     }
                     ethInst.Write(address, writeData, out errorCode, _maxBytesPerPacket);
                     if (errorCode != Eth._ERROR_SUCCESS)
@@ -175,5 +197,6 @@ namespace Lcd
         private UInt32[] _bufferDisplay;
         private UInt32[] _bufferBackground;
         private UInt32 _sentBytes = 0;
+        private const bool _flipImage = true;
     }
 }
