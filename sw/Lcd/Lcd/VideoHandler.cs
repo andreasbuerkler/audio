@@ -46,6 +46,18 @@ namespace Lcd
             _frameBuffer.SetText("waiting ...", 5, 14);
             _waitingBar += 50;
             _frameBuffer.SetSpeed(_waitingBar%8000);
+
+            if ((_waitingBar / 1000) % 2 == 0)
+            {
+                _frameBuffer.SetBgColor(0x0D, Colors.ColorIndex.Yellow);
+                _frameBuffer.SetBgColor(0x0E, Colors.ColorIndex.Blue);
+            }
+            else
+            {
+                _frameBuffer.SetBgColor(0x0D, Colors.ColorIndex.Blue);
+                _frameBuffer.SetBgColor(0x0E, Colors.ColorIndex.Yellow);
+            }
+
             _frameBuffer.UpdateBuffer(_ethernet);
         }
         private void TimerElapsed(Object source, ElapsedEventArgs e)
@@ -62,6 +74,8 @@ namespace Lcd
 
                 if (_acc.TryOpen())
                 {
+                    _frameBuffer.SetBgColor(0x0D, Colors.ColorIndex.Blue);
+                    _frameBuffer.SetBgColor(0x0E, Colors.ColorIndex.Blue);
                     _enable = true;
                 }
                 else
@@ -80,11 +94,50 @@ namespace Lcd
                 return;
             }
 
-            // TODO: unused
+            // Change background color to yellow if TC is active
+            if (pInfo.tcInAction != 0)
+            {
+                _tcHoldCounter = _holdTime;
+            }
+            else
+            {
+                if (_tcHoldCounter > 0)
+                {
+                    _tcHoldCounter--;
+                }
+            }
+            if (_tcHoldCounter == _holdTime - 1)
+            {
+                _frameBuffer.SetBgColor(0x0D, Colors.ColorIndex.Yellow);
+            }
+            if (_tcHoldCounter == 1)
+            {
+                _frameBuffer.SetBgColor(0x0D, Colors.ColorIndex.Blue);
+            }
 
-            // pInfo.tcInAction
-            // pInfo.absInAction
+            // Change background color to yellow if ABS is active
+            if (pInfo.absInAction != 0)
+            {
+                _absHoldCounter = _holdTime;
+            }
+            else
+            {
+                if (_absHoldCounter > 0)
+                {
+                    _absHoldCounter--;
+                }
+            }
+            if (_absHoldCounter == _holdTime - 1)
+            {
+                _frameBuffer.SetBgColor(0x0E, Colors.ColorIndex.Yellow);
+            }
+            if (_absHoldCounter == 1)
+            {
+                _frameBuffer.SetBgColor(0x0E, Colors.ColorIndex.Blue);
+            }
 
+            // TODO: unused values
+            // -------------------
             // gInfo.iLastTime
             // gInfo.isDeltaPositive
             // gInfo.iDeltaLapTime
@@ -128,9 +181,7 @@ namespace Lcd
                 int bestSec = (gInfo.iBestTime / 1000) % 60;
                 int bestMin = gInfo.iBestTime / 60000;
                 string bestMsString = String.Format("{0,0:000}", bestMs);
-                string bestSecString = String.Format("{0,0:" +
-                    "" +
-                    "00}", bestSec);
+                string bestSecString = String.Format("{0,0:00}", bestSec);
                 string bestMinString = String.Format("{0,2}", bestMin);
                 bestString = "best " + bestMinString + ":" + bestSecString + ":" + bestMsString;
                 _frameBuffer.SetText(bestString, 7, 13);
@@ -155,8 +206,8 @@ namespace Lcd
 
             string absString = String.Format("abs  {0,1}", gInfo.abs);
             _frameBuffer.SetText(absString, 13, 33);
-
-            string biasString = String.Format("bias   {0,2}%", (int)(pInfo.brakeBias*100)-14); // TODO: offset only valid for Lexus RFC
+            int brakeBiasPercent = (pInfo.brakeBias == 0.0) ? 0 : (int)(pInfo.brakeBias * 100) - 14; // TODO: offset only valid for Lexus RFC
+            string biasString = String.Format("bias   {0,2}%", brakeBiasPercent);
             _frameBuffer.SetText(biasString, 15, 25);
 
             string brakeTemp0String = String.Format("{0,3:F1}°", pInfo.brakeTemp[0]);
@@ -196,6 +247,9 @@ namespace Lcd
         private Acc _acc;
         private Monitor _monitor;
         private int _waitingBar = 0;
+        private const int _holdTime = 30;
+        private int _tcHoldCounter = 0;
+        private int _absHoldCounter = 0;
         private bool _enable = false;
         private bool _lock = false;
     }

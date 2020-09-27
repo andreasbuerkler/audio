@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace Lcd
 {
@@ -9,19 +7,27 @@ namespace Lcd
 
         public void GetBackground(out UInt32[] background)
         {
-            
             background = new uint[_bufferSize];
             for (UInt32 verticalIndex = 0; verticalIndex < _numberOfVerticalTiles; verticalIndex++)
             {
                 for (UInt32 horizontalIndex = 0; horizontalIndex < _numberOfHorizontalTiles; horizontalIndex++)
                 {
-                    bool top = (verticalIndex == 0) ? false : (_bg[verticalIndex, horizontalIndex] & 0xF) == (_bg[verticalIndex - 1, horizontalIndex] & 0xF);
-                    bool bottom = (verticalIndex == _numberOfVerticalTiles - 1) ? false : (_bg[verticalIndex, horizontalIndex] & 0xF) == (_bg[verticalIndex + 1, horizontalIndex] & 0xF);
-                    bool left = (horizontalIndex == 0) ? false : (_bg[verticalIndex, horizontalIndex] & 0xF) == (_bg[verticalIndex, horizontalIndex - 1] & 0xF);
-                    bool right = (horizontalIndex == _numberOfHorizontalTiles - 1) ? false : (_bg[verticalIndex, horizontalIndex] & 0xF) == (_bg[verticalIndex, horizontalIndex + 1] & 0xF);
-                    int color = _bg[verticalIndex, horizontalIndex] >> 4;
+                    bool top = (verticalIndex == 0) ? false : _bg[verticalIndex, horizontalIndex] == _bg[verticalIndex - 1, horizontalIndex];
+                    bool bottom = (verticalIndex == _numberOfVerticalTiles - 1) ? false : _bg[verticalIndex, horizontalIndex] == _bg[verticalIndex + 1, horizontalIndex];
+                    bool left = (horizontalIndex == 0) ? false : _bg[verticalIndex, horizontalIndex] == _bg[verticalIndex, horizontalIndex - 1];
+                    bool right = (horizontalIndex == _numberOfHorizontalTiles - 1) ? false : _bg[verticalIndex, horizontalIndex] == _bg[verticalIndex, horizontalIndex + 1];
+
+                    int color = _color[_bg[verticalIndex, horizontalIndex]];
                     AddTile(verticalIndex, horizontalIndex, top, bottom, left, right, color, ref background);
                 }
+            }
+        }
+
+        public void SetColor(int index, byte color)
+        {
+            if ((index < _color.Length) && (index >= 0))
+            {
+                _color[index] = color;
             }
         }
 
@@ -32,17 +38,17 @@ namespace Lcd
             UInt32 colorDark = Colors._black;
             switch (colorCode)
             {
-                case _colorIndexBlue:
+                case Colors.ColorIndex.Blue:
                     color = Colors._blue;
                     colorBright = Colors._blueBright;
                     colorDark = Colors._blueDark;
                     break;
-                case _colorIndexYellow:
+                case Colors.ColorIndex.Yellow:
                     color = Colors._yellow;
                     colorBright = Colors._yellowBright;
                     colorDark = Colors._yellowDark;
                     break;
-                case _colorIndexWhite:
+                case Colors.ColorIndex.White:
                     color = Colors._black;
                     colorBright = Colors._white;
                     colorDark = Colors._grey;
@@ -154,18 +160,36 @@ namespace Lcd
         private const int _numberOfVerticalTiles = 8;
         private const int _bufferSize = _numberOfHorizontalTiles * _tileWidth * _numberOfVerticalTiles * _tileHeight;
 
-        private const byte _colorIndexBlack = 0;
-        private const byte _colorIndexBlue = 1;
-        private const byte _colorIndexYellow = 2;
-        private const byte _colorIndexWhite = 3;
+        private byte[] _color = { Colors.ColorIndex.Black,  // 0x00
+                                  Colors.ColorIndex.Blue,   // 0x01
+                                  Colors.ColorIndex.White,  // 0x02
+                                  Colors.ColorIndex.Blue,   // 0x03
+                                  Colors.ColorIndex.Blue,   // 0x04
+                                  Colors.ColorIndex.White,  // 0x05
+                                  Colors.ColorIndex.Blue,   // 0x06
+                                  Colors.ColorIndex.Blue,   // 0x07
+                                  Colors.ColorIndex.Blue,   // 0x08
+                                  Colors.ColorIndex.Blue,   // 0x09
+                                  Colors.ColorIndex.Blue,   // 0x0A
+                                  Colors.ColorIndex.Blue,   // 0x0B
+                                  Colors.ColorIndex.Blue,   // 0x0C
+                                  Colors.ColorIndex.Blue,   // 0x0D
+                                  Colors.ColorIndex.Blue,   // 0x0E
+                                  Colors.ColorIndex.Blue,   // 0x0F
+                                  Colors.ColorIndex.Blue,   // 0x10
+                                  Colors.ColorIndex.Blue,   // 0x11
+                                  Colors.ColorIndex.Blue,   // 0x12
+                                  Colors.ColorIndex.Blue,   // 0x13
+                                  Colors.ColorIndex.White}; // 0x14
 
         private byte[,] _bg = {{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
                                {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
-                               {0x11, 0x11, 0x11, 0x32, 0x32, 0x32, 0x32, 0x11, 0x11, 0x11},
-                               {0x12, 0x12, 0x12, 0x31, 0x31, 0x31, 0x31, 0x12, 0x12, 0x12},
-                               {0x00, 0x14, 0x14, 0x14, 0x32, 0x32, 0x14, 0x14, 0x14, 0x00},
-                               {0x00, 0x15, 0x15, 0x15, 0x32, 0x32, 0x15, 0x15, 0x15, 0x00},
-                               {0x11, 0x11, 0x13, 0x13, 0x32, 0x32, 0x13, 0x13, 0x24, 0x24},
-                               {0x12, 0x12, 0x14, 0x14, 0x15, 0x15, 0x16, 0x16, 0x16, 0x17}};
+                               {0x01, 0x01, 0x01, 0x02, 0x02, 0x02, 0x02, 0x03, 0x03, 0x03},
+                               {0x04, 0x04, 0x04, 0x05, 0x05, 0x05, 0x05, 0x06, 0x06, 0x06},
+                               {0x00, 0x07, 0x07, 0x07, 0x14, 0x14, 0x08, 0x08, 0x08, 0x00},
+                               {0x00, 0x09, 0x09, 0x09, 0x14, 0x14, 0x0A, 0x0A, 0x0A, 0x00},
+                               {0x0B, 0x0B, 0x0C, 0x0C, 0x14, 0x14, 0x0D, 0x0D, 0x0E, 0x0E},
+                               {0x0F, 0x0F, 0x10, 0x10, 0x11, 0x11, 0x12, 0x12, 0x12, 0x13}};
+
     }
 }

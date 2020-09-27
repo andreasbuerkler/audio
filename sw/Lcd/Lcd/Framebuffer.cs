@@ -40,6 +40,12 @@ namespace Lcd
             _gear = gear;
         }
 
+        public void SetBgColor(int index, byte color)
+        {
+            _background.SetColor(index, color);
+            _background.GetBackground(out _bufferBackground);
+        }
+
         private void CreateBuffer(out UInt32[] buffer)
         {
             buffer = new uint[_bufferSize / 4];

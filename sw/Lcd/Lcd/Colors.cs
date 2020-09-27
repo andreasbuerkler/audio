@@ -4,6 +4,14 @@ namespace Lcd
 {
     public static class Colors
     {
+        public readonly struct ColorIndex
+        {
+            public const byte Black = 0;
+            public const byte Blue = 1;
+            public const byte Yellow = 2;
+            public const byte White = 3;
+        }
+
         public const UInt32 _black = 0x000;
         public const UInt32 _grey = 0xCCC;
         public const UInt32 _white = 0xFFF;
