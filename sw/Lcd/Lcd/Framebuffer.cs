@@ -6,7 +6,7 @@ namespace Lcd
 {
     class Framebuffer
     {
-        public  Framebuffer()
+        public Framebuffer()
         {
             _bufferDisplay = new UInt32[_bufferSize / 4];
             _text = new TextDisplay();
@@ -155,7 +155,7 @@ namespace Lcd
                         }
                     }
                     ethInst.Write(address, writeData, out errorCode, _maxBytesPerPacket);
-                    if (errorCode != Eth._ERROR_SUCCESS)
+                    if (errorCode != Eth._errorSuccess)
                     {
                         Console.WriteLine("\nErrorCode = " + errorCode);
                         return false;
@@ -171,7 +171,7 @@ namespace Lcd
                         {
                             return false;
                         }
-                        if (errorCode != Eth._ERROR_SUCCESS)
+                        if (errorCode != Eth._errorSuccess)
                         {
                             Console.WriteLine("\nErrorCode = " + errorCode);
                             return false;

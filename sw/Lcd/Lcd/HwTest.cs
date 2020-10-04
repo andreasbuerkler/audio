@@ -41,7 +41,7 @@ namespace Lcd
                     }
                 }
                 ethInst.Write(address, writeData, out errorCode, bytesPerPacket);
-                if (errorCode != Eth._ERROR_SUCCESS)
+                if (errorCode != Eth._errorSuccess)
                 {
                     Console.WriteLine("\nErrorCode = " + errorCode);
                 }
@@ -63,7 +63,7 @@ namespace Lcd
 
                 ethInst.Read(address, out dataArray, out errorCode, bytesPerPacket);
 
-                if (errorCode != Eth._ERROR_SUCCESS)
+                if (errorCode != Eth._errorSuccess)
                 {
                     Console.WriteLine("\nErrorCode = " + errorCode + " at address " + addressOffset.ToString("X"));
                     break;

@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace Lcd
 {
@@ -20,7 +18,7 @@ namespace Lcd
 
             UInt32 errorCode;
             UInt32 size = 2; // Write address + 16 bytes (3 byte)
-            UInt32 memoryAddress = ADDRESS_OFFSET | (UInt32)((size << 8) & 0xFF00) | (UInt32)(device & 0x7F);
+            UInt32 memoryAddress = _addressOffset | (UInt32)((size << 8) & 0xFF00) | (UInt32)(device & 0x7F);
             UInt32 memoryData = (UInt32)((int)address << 24) | (UInt32)((int)data << 8);
             bool status;
             status = _ethInst.Write32(memoryAddress, memoryData, out errorCode);
@@ -31,7 +29,7 @@ namespace Lcd
             }
 
             // read error bit
-            memoryAddress = ADDRESS_OFFSET | 0x80;
+            memoryAddress = _addressOffset | 0x80;
             UInt32 errorBit;
             status = _ethInst.Read32(memoryAddress, out errorBit, out errorCode);
             if (!status)
@@ -57,7 +55,7 @@ namespace Lcd
 
             UInt32 errorCode;
             UInt32 size = 0; // Write address (1 byte)
-            UInt32 memoryAddress = ADDRESS_OFFSET | (UInt32)((size<<8) & 0xFF00) | (UInt32)(device & 0x7F);
+            UInt32 memoryAddress = _addressOffset | (UInt32)((size<<8) & 0xFF00) | (UInt32)(device & 0x7F);
             UInt32 memoryData = (UInt32)((int)address << 24);
             bool status;
             status = _ethInst.Write32(memoryAddress, memoryData, out errorCode);
@@ -68,7 +66,7 @@ namespace Lcd
             }
 
             size = 1; // Read 2 byte
-            memoryAddress = ADDRESS_OFFSET | (UInt32)((size << 8) & 0xFF00) | (UInt32)(device & 0x7F);
+            memoryAddress = _addressOffset | (UInt32)((size << 8) & 0xFF00) | (UInt32)(device & 0x7F);
             status = _ethInst.Read32(memoryAddress, out memoryData, out errorCode);
             if (!status) {
                 Console.WriteLine("Read data failed: ErrorCode = " + errorCode + " " + GetErrorString(errorCode));
@@ -77,7 +75,7 @@ namespace Lcd
             }
 
             // read error bit
-            memoryAddress = ADDRESS_OFFSET | 0x80;
+            memoryAddress = _addressOffset | 0x80;
             UInt32 errorBit;
             status = _ethInst.Read32(memoryAddress, out errorBit, out errorCode);
             if (!status) {
@@ -97,21 +95,20 @@ namespace Lcd
 
         private string GetErrorString(UInt32 Error) {
             switch (Error) {
-                case Eth._ERROR_SUCCESS:         return "success";
-                case Eth._ERROR_UDP_TIMEOUT:     return "udp timeout";
-                case Eth._ERROR_TYPE:            return "type";
-                case Eth._ERROR_RECEIVED_LENGTH: return "received length";
-                case Eth._ERROR_PACKET_LENGTH:   return "packet length";
-                case Eth._ERROR_SEND:            return "send";
-                case Eth._ERROR_RECEIVE:         return "receive";
-                case Eth._ERROR_EXCEPTION:       return "exception";
-                case Eth._ERROR_PACKET_ID:       return "wrong packet id";
-                case Eth._ERROR_READ_TIMEOUT:    return "read timeout";
-                default:                         return "unknown";
+                case Eth._errorSuccess:        return "success";
+                case Eth._errorUdpTimeout:     return "udp timeout";
+                case Eth._errorType:           return "type";
+                case Eth._errorReceivedLength: return "received length";
+                case Eth._errorPacketLength:   return "packet length";
+                case Eth._errorSend:           return "send";
+                case Eth._errorException:      return "exception";
+                case Eth._errorPacketId:       return "wrong packet id";
+                case Eth._errorReadTimeout:    return "read timeout";
+                default:                       return "unknown";
             }
         }
 
         private Eth _ethInst;
-        private const UInt32 ADDRESS_OFFSET = 0x00400000;
+        private const UInt32 _addressOffset = 0x00400000;
     }
 }
