@@ -19,6 +19,8 @@ namespace Lcd
                 }
                 _udpClient.Connect(ipAddress, port);
                 _remoteIpEndPoint = new IPEndPoint(ipAddress, port);
+                _udpClient.Client.SendTimeout = 500;
+                _udpClient.Client.ReceiveTimeout = 500;
                 _mutex = new Mutex();
             } catch (Exception e) {
                 Console.WriteLine(e.ToString());
@@ -163,46 +165,42 @@ namespace Lcd
         private bool GetReadData(out List<UInt32> data, out UInt32 errorCode, Byte packetId, UInt16 NumberOfBytes) {
             data = new List<UInt32>();
             try {
-                int timeout = _timeoutMs;
-                while (timeout > 0) {
-                    if (_udpClient.Available >= 7) {
-                        Byte[] receiveBytes = _udpClient.Receive(ref _remoteIpEndPoint);
-                        if (receiveBytes[0] != packetId) {
-                            errorCode = _errorPacketId;
-                            return false;
-                        }
-                        if (receiveBytes[1] == _udpReadTimeout) {
-                            errorCode = _errorReadTimeout;
-                            return false;
-                        }
-                        if (receiveBytes[1] != _udpReadResponse) {
-                            errorCode = _errorType;
-                            return false;
-                        }
-                        if (( (((UInt16)receiveBytes[2]) << 8) | receiveBytes[3]) != NumberOfBytes) { // length
-                            errorCode = _errorReceivedLength;
-                            return false;
-                        }
-                        if (receiveBytes.Length != (4+NumberOfBytes)) {
-                            errorCode = _errorPacketLength;
-                            return false;
-                        }
-
-                        for (int dataword = 0; dataword < NumberOfBytes; dataword += 4) {
-                            UInt32 receivedData = 0;
-                            for (int databyte = 3; databyte >= 0; databyte--) {
-                                receivedData |= Convert.ToUInt32((int)(receiveBytes[dataword + databyte + 4] << ((3 - databyte) * 8)) & 0xFFFFFFFF);
-                            }
-                            data.Add(receivedData);
-                        }
-                        errorCode = _errorSuccess;
-                        return true;
-                    }
-                    Thread.Sleep(1);
-                    timeout--;
+                Byte[] receiveBytes = _udpClient.Receive(ref _remoteIpEndPoint);
+                if (receiveBytes.Length < 7)
+                {
+                    errorCode = _errorUdpTimeout;
+                    return false;
                 }
-                errorCode = _errorUdpTimeout;
-                return false;
+                if (receiveBytes[0] != packetId) {
+                    errorCode = _errorPacketId;
+                    return false;
+                }
+                if (receiveBytes[1] == _udpReadTimeout) {
+                    errorCode = _errorReadTimeout;
+                    return false;
+                }
+                if (receiveBytes[1] != _udpReadResponse) {
+                    errorCode = _errorType;
+                    return false;
+                }
+                if (( (((UInt16)receiveBytes[2]) << 8) | receiveBytes[3]) != NumberOfBytes) { // length
+                    errorCode = _errorReceivedLength;
+                    return false;
+                }
+                if (receiveBytes.Length != (4+NumberOfBytes)) {
+                    errorCode = _errorPacketLength;
+                    return false;
+                }
+
+                for (int dataword = 0; dataword < NumberOfBytes; dataword += 4) {
+                    UInt32 receivedData = 0;
+                    for (int databyte = 3; databyte >= 0; databyte--) {
+                        receivedData |= Convert.ToUInt32((int)(receiveBytes[dataword + databyte + 4] << ((3 - databyte) * 8)) & 0xFFFFFFFF);
+                    }
+                    data.Add(receivedData);
+                }
+                errorCode = _errorSuccess;
+                return true;
             }
             catch (Exception e) {
                 Console.WriteLine(e.ToString());
@@ -219,7 +217,6 @@ namespace Lcd
         private const Byte _udpWrite = 0x02;
         private const Byte _udpReadResponse = 0x04;
         private const Byte _udpReadTimeout = 0x08;
-        private const int _timeoutMs = 100;
 
         public const UInt32 _errorSuccess = 0x00;
         public const UInt32 _errorUdpTimeout = 0x01;

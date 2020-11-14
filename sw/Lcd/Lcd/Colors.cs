@@ -25,5 +25,7 @@ namespace Lcd
         public const UInt32 _yellowBright = 0x985;
 
         public const UInt32 _green = 0x0F0;
+        public const UInt32 _orange = 0xF80;
+        public const UInt32 _red = 0xF00;
     }
 }

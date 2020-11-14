@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Threading;
 
 namespace Lcd
 {
@@ -11,6 +10,7 @@ namespace Lcd
             Console.Write("\n");
             const UInt32 memorySize = 8388608; // 8 MByte
             const UInt16 bytesPerPacket = 1024; // number of bytes per eth packet
+            UInt32 _sentBytes = 0;
             UInt32[] testData = new uint[8388608 / 4];
 
             // create random test data
@@ -45,11 +45,19 @@ namespace Lcd
                 {
                     Console.WriteLine("\nErrorCode = " + errorCode);
                 }
-                // prevent from FIFO overflow
-                if (addressOffset % 4096 == 0)
+                // workaround to handle 100mbit receiver (read id)
+                _sentBytes += bytesPerPacket;
+                if (_sentBytes >= 10000)
                 {
-                    Thread.Sleep(1);
+                    _sentBytes = 0;
+                    UInt32 receiveData;
+                    if ((!ethInst.Read32(0, out receiveData, out errorCode)) ||
+                       (errorCode != Eth._errorSuccess) || (receiveData != 0xBEEF0123))
+                    {
+                        Console.WriteLine("\nRead failed");
+                    }
                 }
+
                 Console.Write("\r -> write to address  0x" + addressOffset.ToString("X"));
             }
             Console.Write("\n");

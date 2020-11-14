@@ -28,7 +28,15 @@ namespace Lcd
             }
             else
             {
-                pixel = Colors._blueBright;
+                if (_speed > 7500) {
+                    pixel = Colors._red;
+                }
+                else if (_speed > 7000) {
+                    pixel = Colors._yellow;
+                }
+                else {
+                    pixel = Colors._blueBright;
+                }
             }
             return true;
         }

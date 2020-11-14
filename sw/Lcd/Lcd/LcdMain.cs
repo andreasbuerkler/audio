@@ -17,7 +17,8 @@ namespace Lcd
                   ((args.Length == 2) && Equals(args[0], "R")) ||
                   ((args.Length == 1) && Equals(args[0], "I")) ||
                   ((args.Length == 1) && Equals(args[0], "T")) ||
-                  ((args.Length == 1) && Equals(args[0], "Q")))) {
+                  ((args.Length == 1) && Equals(args[0], "Q")) ||
+                  (args.Length == 0))) {
                 Console.WriteLine("Usage: Lcd [R/W] [Address] ([Data]) <memory r/w>");
                 Console.WriteLine("       Lcd [I]                      <I2C test>");
                 Console.WriteLine("       Lcd [T]                      <memory test>");
@@ -25,7 +26,29 @@ namespace Lcd
             }
             else
             {
-                if (Equals(args[0], "W"))
+                if (args.Length == 0)
+                {
+                    // enable video output
+                    UInt32 errorCode = 0;
+                    ethInst.Write32(0x04, 0x07, out errorCode);
+                    if (errorCode != Eth._errorSuccess)
+                    {
+                        Console.WriteLine("ErrorCode = " + errorCode);
+                        return;
+                    }
+                    else
+                    {
+                        VideoHandler handle = new VideoHandler(ethInst, monitorInst);
+                        while (true);
+                    }
+                }
+                if (Equals(args[0], "Q"))
+                {
+                    // video output
+                    VideoHandler handle = new VideoHandler(ethInst, monitorInst);
+                    while (true);
+                }
+                else if (Equals(args[0], "W"))
                 {
                     // write word
                     UInt32 errorCode = 0;
@@ -49,12 +72,6 @@ namespace Lcd
                 {
                     // memory test
                     HwTest.memTest(ethInst, true);
-                }
-                else if (Equals(args[0], "Q"))
-                {
-                    // video output
-                    VideoHandler handle = new VideoHandler(ethInst, monitorInst);
-                    while (true);
                 }
                 else
                 {

@@ -160,26 +160,16 @@ namespace Lcd
                         Console.WriteLine("\nErrorCode = " + errorCode);
                         return false;
                     }
-                    // prevent from FIFO overflow
+                    // workaround to handle 100mbit receiver (read id)
                     _sentBytes += _maxBytesPerPacket;
                     if (_sentBytes >= 10000)
                     {
                         _sentBytes = 0;
-                        // workaround to handle 100mbit receiver (read id)
                         UInt32 receiveData;
-                        if (!ethInst.Read32(0, out receiveData, out errorCode))
+                        if ((!ethInst.Read32(0, out receiveData, out errorCode)) ||
+                           (errorCode != Eth._errorSuccess) || (receiveData != 0xBEEF0123))
                         {
-                            return false;
-                        }
-                        if (errorCode != Eth._errorSuccess)
-                        {
-                            Console.WriteLine("\nErrorCode = " + errorCode);
-                            return false;
-                        }
-                        if (receiveData != 0xBEEF0123)
-                        {
-                            Console.WriteLine("\nID wrong");
-                            return false;
+                            Console.WriteLine("\nRead failed");
                         }
                     }
                 }
